@@ -49,7 +49,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await themeProvider.updateSettings(_settings);
     audioProvider.setQari(_settings.qari);
 
-    // إعادة جدولة التنبيهات بناءً على الإعدادات الجديدة
     await PrayerTimesService.refreshAndScheduleAllPrayers();
 
     if (mounted) {
@@ -80,7 +79,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // استرجاع منطق التصفير
   Future<void> _resetKhatma() async {
     bool confirm = await _showConfirmDialog('تصفير الختمة', 'هل أنت متأكد من تصفير تقدم الختمة والبدء من جديد؟');
     if (confirm) {
@@ -311,6 +309,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildDropdownSetting(String title, String value, Map<String, String> items, ValueChanged<String?> onChanged) {
+    // صمام أمان: إذا كانت القيمة المختارة غير موجودة في القائمة، نختار القيمة الأولى تلقائياً لمنع الخطأ الأحمر
+    String effectiveValue = items.containsKey(value) ? value : items.keys.first;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
       child: Row(
@@ -318,7 +319,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Text(title, style: GoogleFonts.amiri(color: Colors.white, fontSize: 16)),
           DropdownButton<String>(
-            value: value,
+            value: effectiveValue,
             items: items.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
             onChanged: onChanged,
             dropdownColor: const Color(0xFF0D3B2E),
