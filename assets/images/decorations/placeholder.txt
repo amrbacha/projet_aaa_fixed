@@ -1,0 +1,1 @@
+This folder is for decorative elements like SVG patterns.
