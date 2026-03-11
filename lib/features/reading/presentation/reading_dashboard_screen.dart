@@ -2,12 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../core/providers/theme_provider.dart';
+import '../../../l10n/app_localizations.dart'; 
 import '../../../core/services/local_storage_service.dart';
 import '../../../core/services/settings_service.dart';
-import '../../../core/services/quran_service.dart';
 import '../../../models/settings_model.dart';
 import '../../../widgets/islamic_background.dart';
 
@@ -23,6 +21,7 @@ class _ReadingDashboardScreenState extends State<ReadingDashboardScreen> {
   int _lastVerseIndex = 0;
   double _progressPercent = 0.0;
   int _currentDay = 1;
+  int _completedKhatmas = 0;
   bool _isLoading = true;
   AppSettings _settings = AppSettings.defaultSettings();
   Timer? _clockTimer;
@@ -49,22 +48,26 @@ class _ReadingDashboardScreenState extends State<ReadingDashboardScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     final settings = await SettingsService.loadSettings();
-    final lastIndex = await LocalStorageService.getQuranProgress();
+    final lastIndex = await LocalStorageService.getReadingProgress();
+    final khatmasCount = await LocalStorageService.getCompletedKhatmasCount();
     const totalVerses = 6236;
 
     setState(() {
       _settings = settings;
       _lastVerseIndex = lastIndex;
+      _completedKhatmas = khatmasCount;
       _progressPercent = (lastIndex / totalVerses) * 100;
       final versesPerDay = (totalVerses / _settings.khatmaDuration).ceil();
       _currentDay = (lastIndex / versesPerDay).floor() + 1;
+      if (_currentDay > _settings.khatmaDuration) _currentDay = _settings.khatmaDuration;
       _isLoading = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
+    if (l10n == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return IslamicBackground(
       child: Scaffold(
@@ -73,7 +76,7 @@ class _ReadingDashboardScreenState extends State<ReadingDashboardScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: true,
-          title: Text('ختمة القراءة', style: GoogleFonts.amiri(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
+          title: Text("الختمة بالقراءة", style: GoogleFonts.amiri(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
             onPressed: () => context.go('/main-menu'),
@@ -85,13 +88,13 @@ class _ReadingDashboardScreenState extends State<ReadingDashboardScreen> {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  _buildTimeCard(),
+                  _buildTimeCard(l10n),
                   const SizedBox(height: 16),
-                  _buildProgressCard(),
+                  _buildProgressCard(l10n),
                   const SizedBox(height: 16),
-                  _buildGridSettings(context),
+                  _buildGridSettings(context, l10n),
                   const SizedBox(height: 24),
-                  _buildStartReadingButton(context),
+                  _buildStartReadingButton(context, l10n),
                 ],
               ),
             ),
@@ -99,7 +102,7 @@ class _ReadingDashboardScreenState extends State<ReadingDashboardScreen> {
     );
   }
 
-  Widget _buildTimeCard() {
+  Widget _buildTimeCard(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -113,18 +116,18 @@ class _ReadingDashboardScreenState extends State<ReadingDashboardScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('الوقت الحالي', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              Text("الوقت الآن", style: const TextStyle(color: Colors.white70, fontSize: 12)),
               Text(DateFormat('HH:mm:ss').format(_now),
                   style: GoogleFonts.notoSans(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
             ],
           ),
-          const Icon(Icons.menu_book_outlined, color: Color(0xFFF5A623), size: 35),
+          const Icon(Icons.auto_stories_outlined, color: Color(0xFFF5A623), size: 35),
         ],
       ),
     );
   }
 
-  Widget _buildProgressCard() {
+  Widget _buildProgressCard(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -138,7 +141,7 @@ class _ReadingDashboardScreenState extends State<ReadingDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('تقدم الختمة', style: GoogleFonts.amiri(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              Text("تقدم الختمة بالقراءة", style: GoogleFonts.amiri(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               Text('${_progressPercent.toStringAsFixed(1)}%', 
                   style: GoogleFonts.notoSans(color: const Color(0xFFF5A623), fontSize: 18, fontWeight: FontWeight.bold)),
             ],
@@ -154,21 +157,22 @@ class _ReadingDashboardScreenState extends State<ReadingDashboardScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text('اليوم الحالي في الرحلة: ${_toArabicDigits(_currentDay)}', 
+          Text('اليوم: ${_currentDay}',
               style: GoogleFonts.amiri(color: Colors.white70, fontSize: 14)),
         ],
       ),
     );
   }
 
-  Widget _buildGridSettings(BuildContext context) {
+  Widget _buildGridSettings(BuildContext context, AppLocalizations l10n) {
     return Row(
       children: [
-        Expanded(child: _buildGridItem(title: 'مدة الختمة', content: '${_toArabicDigits(_settings.khatmaDuration)} يوم', icon: Icons.calendar_month)),
+        // تعديل: المربع الأوسط يظهر الآن عدد الختمات المكتملة
+        Expanded(child: _buildGridItem(title: "عدد الختمات", content: '${_completedKhatmas}', icon: Icons.workspace_premium)),
         const SizedBox(width: 12),
-        Expanded(child: _buildGridItem(title: 'ختمات سابقة', content: '٠', icon: Icons.history_edu)),
+        Expanded(child: _buildGridItem(title: "أذكار الصباح", content: 'ابدأ', icon: Icons.wb_sunny_outlined, onTap: () => context.push('/adhkar'))),
         const SizedBox(width: 12),
-        Expanded(child: _buildGridItem(title: 'الإعدادات', icon: Icons.settings, onTap: () => context.push('/reading-settings').then((_) => _loadData()))),
+        Expanded(child: _buildGridItem(title: "الإعدادات", icon: Icons.settings, onTap: () => context.push('/reading-settings').then((_) => _loadData()))),
       ],
     );
   }
@@ -201,27 +205,27 @@ class _ReadingDashboardScreenState extends State<ReadingDashboardScreen> {
     );
   }
 
-  Widget _buildStartReadingButton(BuildContext context) {
+  Widget _buildStartReadingButton(BuildContext context, AppLocalizations l10n) {
     return InkWell(
       onTap: () => context.push('/reading-player'),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [Color(0xFF1ABC9C), Color(0xFF16A085)]),
+          gradient: const LinearGradient(colors: [Color(0xFFF5A623), Color(0xFFD48106)]),
           borderRadius: BorderRadius.circular(24),
-          boxShadow: [BoxShadow(color: const Color(0xFF1ABC9C).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: const Color(0xFFF5A623).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Row(
           children: [
-            const Icon(Icons.menu_book_rounded, color: Colors.white, size: 48),
+            const Icon(Icons.auto_stories, color: Colors.white, size: 48),
             const SizedBox(width: 18),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('ابدأ قراءة الورد اليومي', style: GoogleFonts.amiri(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                  Text('وردك القرآني جاهز. اضغط للبدء.', style: GoogleFonts.amiri(color: Colors.white.withOpacity(0.85), fontSize: 14)),
+                  Text("ابدأ القراءة الآن", style: GoogleFonts.amiri(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text("أتمم وردك اليومي من كتاب الله بخشوع وتدبر", style: GoogleFonts.amiri(color: Colors.white.withOpacity(0.85), fontSize: 14)),
                 ],
               ),
             ),
@@ -230,10 +234,5 @@ class _ReadingDashboardScreenState extends State<ReadingDashboardScreen> {
         ),
       ),
     );
-  }
-
-  String _toArabicDigits(int number) {
-    const map = {'0':'٠','1':'١','2':'٢','3':'٣','4':'٤','5':'٥','6':'٦','7':'٧','8':'٨','9':'٩'};
-    return number.toString().split('').map((c) => map[c] ?? c).join();
   }
 }

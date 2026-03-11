@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import 'package:projet_aaa/widgets/islamic_background.dart';
+import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
 import '../data/models/asma_model.dart';
 import '../data/asma_data.dart';
 
@@ -79,7 +79,7 @@ class _AsmaQuizScreenState extends State<AsmaQuizScreen> {
           children: [
             Text('نتيجتك هي: $score من 10', style: GoogleFonts.amiri(color: const Color(0xFFF5A623), fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            Text(score == 10 ? 'ما شاء الله! لقد نلت الدرجة الكاملة بجدارة.' : (score >= 7 ? 'أحسنت! علمك بأسماء الله واسع.' : 'محاولة جيدة، استمر في التعلم والتدبر.')),
+            score == 10 ? const Text('ما شاء الله! لقد نلت الدرجة الكاملة بجدارة.') : (score >= 7 ? const Text('أحسنت! علمك بأسماء الله واسع.') : const Text('محاولة جيدة، استمر في التعلم والتدبر.')),
           ],
         ),
         actions: [

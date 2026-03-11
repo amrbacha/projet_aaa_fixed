@@ -2,10 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../core/services/local_storage_service.dart';
 import '../../../widgets/islamic_background.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/theme_provider.dart';
+import '../../../core/services/assistant_service.dart';
 
 class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
@@ -16,6 +18,8 @@ class MainMenuScreen extends StatefulWidget {
 
 class _MainMenuScreenState extends State<MainMenuScreen> {
   String _userName = "";
+  final AssistantService _anis = AssistantService();
+  bool _hasWelcomed = false;
 
   static const double _globalOpacity = 0.1;
   static const double _globalBorderOpacity = 0.2;
@@ -23,39 +27,44 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUsername();
+    _initializeMenu();
   }
 
-  Future<void> _loadUsername() async {
+  Future<void> _initializeMenu() async {
     final userData = await LocalStorageService.getUserData();
     if (mounted) {
       setState(() {
         _userName = userData['fullName'] ?? "";
       });
+      
+      // المبادرة بالترحيب الاجتماعي الذكي لمرة واحدة عند الدخول
+      if (!_hasWelcomed && _userName.isNotEmpty) {
+        _hasWelcomed = true;
+        Future.delayed(const Duration(seconds: 1), () {
+          _anis.welcomeUser(_userName);
+        });
+      }
     }
   }
 
   Future<void> _showExitDialog(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: const Color(0xFF0D3B2E),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('تأكيد الخروج', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          content: const Text('هل أنت متأكد أنك تريد الخروج من التطبيق؟', style: TextStyle(color: Colors.white70)),
+          title: Text(l10n.confirmExit, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: Text(l10n.exitMessage, style: const TextStyle(color: Colors.white70)),
           actions: <Widget>[
             TextButton(
-              child: const Text('لا', style: TextStyle(color: Colors.white)),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              child: Text(l10n.no, style: const TextStyle(color: Colors.white)),
+              onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: const Text('نعم', style: TextStyle(color: Color(0xFFF5A623))),
-              onPressed: () {
-                exit(0);
-              },
+              child: Text(l10n.yes, style: const TextStyle(color: Color(0xFFF5A623))),
+              onPressed: () => exit(0),
             ),
           ],
         );
@@ -67,6 +76,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tt = theme.textTheme;
+    final l10n = AppLocalizations.of(context);
+    
+    if (l10n == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return IslamicBackground(
       child: Scaffold(
@@ -74,7 +86,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          title: Text("مساعد الصلاة", style: tt.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+          title: Text(l10n.appTitle, style: tt.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
           centerTitle: true,
           leading: IconButton(
             onPressed: () => context.push('/language'),
@@ -92,16 +104,17 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           child: Column(
             children: [
               const SizedBox(height: 10),
-              Text("السلام عليكم، $_userName", style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
+              // عرض الترحيب النصي
+              Text(l10n.greeting(_userName), style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
               const SizedBox(height: 8),
-              Text("أهلاً بك في رحاب الطاعة. اختر وجهتك اليوم لترتقي سوياً في درجات الإيمان", 
+              Text(l10n.welcomeMessage, 
                   style: tt.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.9)), textAlign: TextAlign.center),
               const SizedBox(height: 24),
-              _buildKhatmaCard(context, theme),
+              _buildKhatmaCard(context, theme, l10n),
               const SizedBox(height: 24),
               Align(
-                alignment: Alignment.centerRight,
-                child: Text("الخدمات والبرامج", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(l10n.servicesTitle, style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
               ),
               const SizedBox(height: 16),
               GridView.count(
@@ -112,18 +125,18 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 mainAxisSpacing: 16,
                 childAspectRatio: 1.0,
                 children: [
-                  _buildServiceCard(context: context, theme: theme, title: "ختم القرآن بالصلاة", icon: Icons.mosque_outlined, onTap: () => context.push('/home')),
-                  _buildServiceCard(context: context, theme: theme, title: "ختم القرآن بالقراءة", icon: Icons.book_outlined, onTap: () => context.push('/reading')),
-                  _buildServiceCard(context: context, theme: theme, title: "حفظ القرآن الكريم", icon: Icons.school_outlined, onTap: () => context.push('/memorization')),
-                  _buildServiceCard(context: context, theme: theme, title: "التفسير والتدبر", icon: Icons.lightbulb_outline, onTap: () => context.push('/tafseer')),
-                  _buildServiceCard(context: context, theme: theme, title: "الأذكار والأدعية", icon: Icons.favorite_border, onTap: () => context.push('/adhkar')),
-                  _buildServiceCard(context: context, theme: theme, title: "التسبيح", icon: Icons.all_inclusive, onTap: () => context.push('/tasbeeh')),
-                  _buildServiceCard(context: context, theme: theme, title: "اتجاه القبلة", icon: Icons.explore_outlined, onTap: () => context.push('/qibla')),
-                  _buildServiceCard(context: context, theme: theme, title: "أسماء الله الحسنى", icon: Icons.auto_awesome_outlined, onTap: () => context.push('/asma-allah')),
+                  _buildServiceCard(context: context, theme: theme, title: l10n.prayerKhatma, icon: Icons.mosque_outlined, onTap: () => context.push('/home'), l10n: l10n),
+                  _buildServiceCard(context: context, theme: theme, title: l10n.readingQuran, icon: Icons.book_outlined, onTap: () => context.push('/reading'), l10n: l10n),
+                  _buildServiceCard(context: context, theme: theme, title: l10n.memorization, icon: Icons.school_outlined, onTap: () => context.push('/memorization'), l10n: l10n),
+                  _buildServiceCard(context: context, theme: theme, title: l10n.tafseer, icon: Icons.lightbulb_outline, onTap: () => context.push('/tafseer'), l10n: l10n),
+                  _buildServiceCard(context: context, theme: theme, title: l10n.adhkar, icon: Icons.favorite_border, onTap: () => context.push('/adhkar'), l10n: l10n),
+                  _buildServiceCard(context: context, theme: theme, title: l10n.tasbeeh, icon: Icons.all_inclusive, onTap: () => context.push('/tasbeeh'), l10n: l10n),
+                  _buildServiceCard(context: context, theme: theme, title: l10n.qiblaDirection, icon: Icons.explore_outlined, onTap: () => context.push('/qibla'), l10n: l10n),
+                  _buildServiceCard(context: context, theme: theme, title: l10n.asmaAllah, icon: Icons.auto_awesome_outlined, onTap: () => context.push('/asma-allah'), l10n: l10n),
                 ],
               ),
               const SizedBox(height: 24),
-              _buildCertificateCard(context, theme),
+              _buildCertificateCard(context, theme, l10n),
               const SizedBox(height: 30),
             ],
           ),
@@ -132,7 +145,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
-  Widget _buildKhatmaCard(BuildContext context, ThemeData theme) {
+  Widget _buildKhatmaCard(BuildContext context, ThemeData theme, AppLocalizations l10n) {
     final tt = theme.textTheme;
     return Container(
       width: double.infinity,
@@ -146,18 +159,18 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("موصى به", style: tt.titleSmall?.copyWith(color: const Color(0xFFF5A623), fontWeight: FontWeight.bold)),
+          Text(l10n.recommended, style: tt.titleSmall?.copyWith(color: const Color(0xFFF5A623), fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text("رحلة الختمة المباركة", style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
+          Text(l10n.khatmaJourney, style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 6),
-          Text("ابدأ رحلة الإيمان لختم القرآن الكريم تلاوةً أو في صلواتك اليومية.",
+          Text(l10n.khatmaDesc,
               style: tt.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.85))),
         ],
       ),
     );
   }
 
-  Widget _buildCertificateCard(BuildContext context, ThemeData theme) {
+  Widget _buildCertificateCard(BuildContext context, ThemeData theme, AppLocalizations l10n) {
     final tt = theme.textTheme;
     return InkWell(
       onTap: () => context.push('/certificate-selector'),
@@ -178,9 +191,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("شهادات الإنجاز والمكافأة", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
+                  Text(l10n.certificatesTitle, style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
                   const SizedBox(height: 4),
-                  Text("استعرض وثق نجاحاتك في رحلتك مع القرآن.", style: tt.bodySmall?.copyWith(color: Colors.white70)),
+                  Text(l10n.certificatesDesc, style: tt.bodySmall?.copyWith(color: Colors.white70)),
                 ],
               ),
             ),
@@ -197,6 +210,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     required String title,
     required IconData icon,
     required VoidCallback onTap,
+    required AppLocalizations l10n,
   }) {
     final tt = theme.textTheme;
     return GestureDetector(
@@ -215,7 +229,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             const Spacer(),
             Text(title, style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.white, height: 1.2)),
             const SizedBox(height: 8),
-            Text("ابدأ الآن", style: tt.bodySmall?.copyWith(color: Colors.white.withOpacity(0.7), fontWeight: FontWeight.bold)),
+            Text(l10n.startNow, style: tt.bodySmall?.copyWith(color: Colors.white.withOpacity(0.7), fontWeight: FontWeight.bold)),
           ],
         ),
       ),

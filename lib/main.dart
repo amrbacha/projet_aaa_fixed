@@ -1,31 +1,54 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:projet_aaa/core/services/notification_service.dart';
-import 'package:projet_aaa/core/services/assistant_service.dart';
+import 'package:flutter/services.dart';
+import 'package:projet_aaa_fixed/core/services/notification_service.dart';
+import 'package:projet_aaa_fixed/core/services/assistant_service.dart';
+import 'package:projet_aaa_fixed/core/services/quran_service.dart';
 import 'app.dart';
 
-void main() async {
-  // 1. التأكد من تهيئة Flutter
-  WidgetsFlutterBinding.ensureInitialized();
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. تشغيل التطبيق فوراً لتجنب التوقف عند شاشة البداية
-  runApp(const ProjetAaaApp());
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      debugPrint("🔴 [UI Framework Error]: ${details.exception}");
+    };
 
-  // 3. تهيئة الخدمات في الخلفية بعد تشغيل الواجهة
-  _initializeServices();
+    _configureSystemUI();
+
+    runApp(const ProjetAaaApp());
+
+    unawaited(_initializeBackgroundServices());
+
+  }, (error, stack) {
+    debugPrint("🔴 [Global Critical Error]: $error");
+    debugPrint("Stack: $stack");
+  });
 }
 
-Future<void> _initializeServices() async {
+void _configureSystemUI() {
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.black,
+    systemNavigationBarIconBrightness: Brightness.light,
+    systemNavigationBarDividerColor: Colors.transparent,
+  ));
+
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+}
+
+Future<void> _initializeBackgroundServices() async {
   try {
-    // تهيئة الإشعارات
-    final notificationService = NotificationService();
-    await notificationService.init();
-    
-    // تهيئة المساعد الذكي "أنيس"
-    final assistantService = AssistantService();
-    await assistantService.init();
-    
-    debugPrint("All Services (Notifications & Assistant) initialized successfully");
+    await NotificationService().init();
+    await AssistantService().init();
+    await QuranService().getAllVerses(excludeFatiha: false);
+    debugPrint("✨ [System] All smart services initialized successfully.");
   } catch (e) {
-    debugPrint("Error initializing services: $e");
+    debugPrint("⚠️ [System Warning] Background initialization error: $e");
   }
 }

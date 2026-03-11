@@ -1,5 +1,5 @@
-import 'package:projet_aaa/models/quran_data.dart';
-import 'package:projet_aaa/core/services/quran_service.dart'; // Added the missing import
+import 'package:projet_aaa_fixed/models/quran_data.dart';
+import 'package:projet_aaa_fixed/core/services/quran_service.dart';
 
 class DailyWird {
   final int day;

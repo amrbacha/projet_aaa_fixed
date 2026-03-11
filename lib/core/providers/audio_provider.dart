@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:projet_aaa/core/services/settings_service.dart';
-import 'package:projet_aaa/models/settings_model.dart';
+import 'package:projet_aaa_fixed/core/services/settings_service.dart';
+import 'package:projet_aaa_fixed/models/settings_model.dart';
 
 class AudioProvider with ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -10,6 +11,7 @@ class AudioProvider with ChangeNotifier {
   
   String _selectedQari = 'mishary';
   double _playbackRate = 1.0;
+  bool _isSpeaking = false;
 
   String get selectedQari => _selectedQari;
   double get playbackRate => _playbackRate;
@@ -21,30 +23,12 @@ class AudioProvider with ChangeNotifier {
 
   Future<void> _initTts() async {
     await _tts.setLanguage("ar-SA");
-    
-    // سرعة وقورة جداً للإمام (أبطأ لتكون كالصلاة)
-    await _tts.setSpeechRate(0.3); 
-    
-    // ضبط النبرة لتكون غليظة وذكورية (0.7 إلى 0.8)
-    await _tts.setPitch(0.8);
+    await _tts.setSpeechRate(0.35); // سرعة وقورة هادئة
+    await _tts.setPitch(0.85);
 
-    try {
-      List<dynamic> voices = await _tts.getVoices;
-      for (var voice in voices) {
-        String name = voice["name"].toString().toLowerCase();
-        String locale = voice["locale"].toString().toLowerCase();
-        
-        // البحث عن أفضل صوت ذكر عربي (خاصة أصوات جوجل الاحترافية)
-        if (locale.contains("ar") && 
-           (name.contains("male") || name.contains("low") || name.contains("sha") || name.contains("fallback"))) {
-          await _tts.setVoice({"name": voice["name"], "locale": voice["locale"]});
-          debugPrint("Imam Voice Selected: ${voice["name"]}");
-          break;
-        }
-      }
-    } catch (e) {
-      debugPrint("TTS Voice Selection Error: $e");
-    }
+    _tts.setCompletionHandler(() {
+      _isSpeaking = false;
+    });
   }
 
   Future<void> _initAudio() async {
@@ -57,7 +41,7 @@ class AudioProvider with ChangeNotifier {
       ),
       iOS: AudioContextIOS(
         category: AVAudioSessionCategory.playback,
-        options: const {
+        options: {
           AVAudioSessionOptions.mixWithOthers,
           AVAudioSessionOptions.defaultToSpeaker,
         },
@@ -69,6 +53,7 @@ class AudioProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// تغيير القارئ وحفظ الإعدادات (مطلوبة لشاشات الإعدادات)
   Future<void> setQari(String qari) async {
     _selectedQari = qari;
     final currentSettings = await SettingsService.loadSettings();
@@ -77,15 +62,33 @@ class AudioProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// تغيير سرعة التشغيل (مطلوبة لشاشة القراءة)
   Future<void> setPlaybackRate(double rate) async {
     _playbackRate = rate;
     await _audioPlayer.setPlaybackRate(rate);
-    // سرعة الإمام TTS تظل هادئة ووقورة
-    await _tts.setSpeechRate((rate * 0.3).clamp(0.2, 0.4)); 
+    // سرعة الإمام TTS تظل هادئة ووقورة ولكن تتأثر قليلاً بنسبة مئوية
+    await _tts.setSpeechRate((rate * 0.35).clamp(0.2, 0.5)); 
     notifyListeners();
   }
 
-  Stream<void> get onPlayerComplete => _audioPlayer.onPlayerComplete;
+  /// دالة ذكية للانتظار حتى انتهاء الكلام تماماً (تستخدم في الصلاة)
+  Future<void> speakActionAndWait(String text) async {
+    await _audioPlayer.stop();
+    await _tts.stop();
+    
+    Completer completer = Completer();
+    _tts.setCompletionHandler(() {
+      _isSpeaking = false;
+      if (!completer.isCompleted) completer.complete();
+    });
+
+    _isSpeaking = true;
+    await _tts.speak(text);
+    
+    return completer.future.timeout(const Duration(seconds: 15), onTimeout: () {
+      if (!completer.isCompleted) completer.complete();
+    });
+  }
 
   Future<void> playVerse(int surahNumber, int ayahNumber) async {
     String s = surahNumber.toString().padLeft(3, '0');
@@ -94,10 +97,10 @@ class AudioProvider with ChangeNotifier {
     final Map<String, String> qariMap = {
       'mishary': 'Alafasy_128kbps',
       'sudais': 'Abdurrahmaan_As-Sudais_192kbps',
-      'ghamdi': 'Ghamadi_40kbps',
-      'basit': 'Abdul_Basit_Murattal_192kbps',
       'husary': 'Husary_128kbps',
       'minshawi': 'Minshawy_Murattal_128kbps',
+      'ghamdi': 'Ghamadi_40kbps',
+      'basit': 'Abdul_Basit_Murattal_192kbps',
       'muaiqly': 'Maher_AlMuaiqly_64kbps',
       'tablawi': 'Mohammad_al_Tablaway_128kbps',
       'shuraim': 'Saood_ash-Shuraym_128kbps',
@@ -112,18 +115,15 @@ class AudioProvider with ChangeNotifier {
     await _audioPlayer.setPlaybackRate(_playbackRate);
   }
 
-  Future<void> speakAction(String text) async {
-    await _audioPlayer.stop();
-    await _tts.stop();
-    await _tts.speak(text);
-  }
-
-  void setTtsCompletionHandler(VoidCallback callback) {
-    _tts.setCompletionHandler(callback);
-  }
+  Stream<void> get onPlayerComplete => _audioPlayer.onPlayerComplete;
 
   Future<void> stop() async {
     await _audioPlayer.stop();
     await _tts.stop();
+  }
+
+  // إضافة معالج الإكمال لـ TTS لضمان عدم حدوث تعارض في الشاشات الأخرى
+  void setTtsCompletionHandler(VoidCallback callback) {
+    _tts.setCompletionHandler(callback);
   }
 }

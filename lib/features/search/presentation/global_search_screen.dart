@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import 'package:projet_aaa/core/services/global_search_service.dart';
-import 'package:projet_aaa/widgets/islamic_background.dart';
+import 'package:projet_aaa_fixed/core/services/global_search_service.dart';
+import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
 
 class GlobalSearchScreen extends StatefulWidget {
   const GlobalSearchScreen({super.key});
@@ -72,7 +72,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, size: 80, color: Colors.white24),
+          const Icon(Icons.search_off, size: 80, color: Colors.white24),
           const SizedBox(height: 16),
           Text(
             _controller.text.isEmpty ? "ابدأ البحث الآن" : "لا توجد نتائج تطابق بحثك",

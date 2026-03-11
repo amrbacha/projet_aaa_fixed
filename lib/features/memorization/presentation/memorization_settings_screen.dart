@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:projet_aaa/core/providers/audio_provider.dart';
-import 'package:projet_aaa/core/providers/theme_provider.dart';
+import 'package:projet_aaa_fixed/core/providers/audio_provider.dart';
+import 'package:projet_aaa_fixed/core/providers/theme_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/settings_service.dart';
-import '../../../core/services/local_storage_service.dart';
 import '../../../models/settings_model.dart';
 import '../../../widgets/islamic_background.dart';
 

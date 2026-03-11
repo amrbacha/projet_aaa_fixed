@@ -1,5 +1,5 @@
-import 'package:projet_aaa/core/models/quran_data.dart';
-import 'package:projet_aaa/core/services/quran_service.dart';
+import 'package:projet_aaa_fixed/core/models/quran_data.dart';
+import 'package:projet_aaa_fixed/core/services/quran_service.dart';
 import 'local_storage_service.dart';
 
 class WirdService {

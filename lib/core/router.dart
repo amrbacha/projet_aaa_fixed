@@ -1,29 +1,29 @@
 import 'package:go_router/go_router.dart';
-import 'package:projet_aaa/certificate/certificate_selector_screen.dart';
-import 'package:projet_aaa/certificate/certificate_viewer_screen.dart';
-import 'package:projet_aaa/core/models/quran_data.dart';
-import 'package:projet_aaa/features/adhkar/data/models/adhkar_model.dart';
-import 'package:projet_aaa/features/adhkar/presentation/adhkar_screen.dart';
-import 'package:projet_aaa/features/adhkar/presentation/adhkar_session_screen.dart';
-import 'package:projet_aaa/features/main_menu/presentation/main_menu_screen.dart';
-import 'package:projet_aaa/features/memorization/presentation/memorization_dashboard_screen.dart';
-import 'package:projet_aaa/features/memorization/presentation/memorization_session_screen.dart';
-import 'package:projet_aaa/features/memorization/presentation/memorization_settings_screen.dart';
-import 'package:projet_aaa/features/qibla/presentation/qibla_screen.dart';
-import 'package:projet_aaa/features/reading/presentation/reading_dashboard_screen.dart';
-import 'package:projet_aaa/features/reading/presentation/reading_screen.dart';
-import 'package:projet_aaa/features/reading/presentation/reading_settings_screen.dart';
-import 'package:projet_aaa/features/tafseer/presentation/tafseer_screen.dart';
-import 'package:projet_aaa/features/tafseer/presentation/surah_tafseer_screen.dart';
-import 'package:projet_aaa/features/tafseer/presentation/ayah_tadabbur_screen.dart';
-import 'package:projet_aaa/features/tasbeeh/presentation/tasbeeh_screen.dart';
-import 'package:projet_aaa/features/asma_allah/presentation/asma_allah_screen.dart';
-import 'package:projet_aaa/features/asma_allah/presentation/asma_detail_screen.dart';
-import 'package:projet_aaa/features/asma_allah/presentation/asma_quiz_screen.dart';
-import 'package:projet_aaa/features/asma_allah/data/models/asma_model.dart';
-import 'package:projet_aaa/features/search/presentation/global_search_screen.dart';
-import 'package:projet_aaa/features/onboarding/presentation/splash_screen.dart';
-import 'package:projet_aaa/features/onboarding/presentation/voice_calibration_screen.dart';
+import 'package:projet_aaa_fixed/certificate/certificate_selector_screen.dart';
+import 'package:projet_aaa_fixed/certificate/certificate_viewer_screen.dart';
+import 'package:projet_aaa_fixed/core/models/quran_data.dart';
+import 'package:projet_aaa_fixed/features/adhkar/data/models/adhkar_model.dart';
+import 'package:projet_aaa_fixed/features/adhkar/presentation/adhkar_screen.dart';
+import 'package:projet_aaa_fixed/features/adhkar/presentation/adhkar_session_screen.dart';
+import 'package:projet_aaa_fixed/features/main_menu/presentation/main_menu_screen.dart';
+import 'package:projet_aaa_fixed/features/memorization/presentation/memorization_dashboard_screen.dart';
+import 'package:projet_aaa_fixed/features/memorization/presentation/memorization_session_screen.dart';
+import 'package:projet_aaa_fixed/features/memorization/presentation/memorization_settings_screen.dart';
+import 'package:projet_aaa_fixed/features/qibla/presentation/qibla_screen.dart';
+import 'package:projet_aaa_fixed/features/reading/presentation/reading_dashboard_screen.dart';
+import 'package:projet_aaa_fixed/features/reading/presentation/reading_screen.dart';
+import 'package:projet_aaa_fixed/features/reading/presentation/reading_settings_screen.dart';
+import 'package:projet_aaa_fixed/features/tafseer/presentation/tafseer_screen.dart';
+import 'package:projet_aaa_fixed/features/tafseer/presentation/surah_tafseer_screen.dart';
+import 'package:projet_aaa_fixed/features/tafseer/presentation/ayah_tadabbur_screen.dart';
+import 'package:projet_aaa_fixed/features/tasbeeh/presentation/tasbeeh_screen.dart';
+import 'package:projet_aaa_fixed/features/asma_allah/presentation/asma_allah_screen.dart';
+import 'package:projet_aaa_fixed/features/asma_allah/presentation/asma_detail_screen.dart';
+import 'package:projet_aaa_fixed/features/asma_allah/presentation/asma_quiz_screen.dart';
+import 'package:projet_aaa_fixed/features/asma_allah/data/models/asma_model.dart';
+import 'package:projet_aaa_fixed/features/search/presentation/global_search_screen.dart';
+import 'package:projet_aaa_fixed/features/onboarding/presentation/splash_screen.dart';
+import 'package:projet_aaa_fixed/features/onboarding/presentation/voice_calibration_screen.dart';
 import '../features/onboarding/presentation/language_screen.dart';
 import '../features/onboarding/presentation/personal_info_screen.dart';
 import '../features/onboarding/presentation/theme_customization_screen.dart';
@@ -33,7 +33,7 @@ import '../features/prayer/presentation/prayer_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
-    initialLocation: '/splash',
+    initialLocation: '/language',
     routes: [
       GoRoute(
         path: '/splash',

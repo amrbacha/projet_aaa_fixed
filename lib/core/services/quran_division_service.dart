@@ -1,8 +1,8 @@
 import 'dart:async'; // استيراد للمؤقت
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:projet_aaa/core/models/quran_data.dart';
-import 'package:projet_aaa/core/services/quran_service.dart';
+import 'package:projet_aaa_fixed/core/models/quran_data.dart';
+import 'package:projet_aaa_fixed/core/services/quran_service.dart';
 
 class Wird {
   final int day;

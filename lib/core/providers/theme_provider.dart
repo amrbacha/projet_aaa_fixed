@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:projet_aaa/core/services/settings_service.dart';
-import 'package:projet_aaa/models/settings_model.dart';
-import 'package:projet_aaa/core/theme.dart';
+import 'package:projet_aaa_fixed/core/services/settings_service.dart';
+import 'package:projet_aaa_fixed/models/settings_model.dart';
+import 'package:projet_aaa_fixed/core/theme.dart';
+import 'package:projet_aaa_fixed/core/services/local_storage_service.dart';
 
 class ThemeProvider with ChangeNotifier {
   AppSettings _settings = AppSettings.defaultSettings();
   AppSettings get settings => _settings;
+  
+  Locale _locale = const Locale('ar');
+  Locale get locale => _locale;
 
   ThemeData get lightTheme => AppTheme.light(
         primaryColor: Color(settings.primaryColor),
@@ -20,7 +24,14 @@ class ThemeProvider with ChangeNotifier {
   ThemeMode get themeMode => settings.isDarkMode ? ThemeMode.dark : ThemeMode.light;
 
   ThemeProvider() {
-    loadSettings();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await loadSettings();
+    final langCode = await LocalStorageService.getLanguage();
+    _locale = Locale(langCode);
+    notifyListeners();
   }
 
   Future<void> loadSettings() async {
@@ -34,7 +45,12 @@ class ThemeProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Helper to update just the dark mode
+  Future<void> setLocale(String langCode) async {
+    _locale = Locale(langCode);
+    await LocalStorageService.saveLanguage(langCode);
+    notifyListeners();
+  }
+
   Future<void> setTheme(bool isDarkMode) async {
     final newSettings = _settings.copyWith(isDarkMode: isDarkMode);
     await updateSettings(newSettings);

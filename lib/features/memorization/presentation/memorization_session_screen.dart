@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:projet_aaa/core/models/quran_data.dart';
-import 'package:projet_aaa/core/providers/audio_provider.dart';
-import 'package:projet_aaa/widgets/islamic_background.dart';
+import 'package:projet_aaa_fixed/core/models/quran_data.dart';
+import 'package:projet_aaa_fixed/core/providers/audio_provider.dart';
+import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
 
 class MemorizationSessionScreen extends StatefulWidget {
   final Surah surah;

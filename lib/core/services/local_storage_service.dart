@@ -44,18 +44,53 @@ class LocalStorageService {
     };
   }
 
-  // ميزات الورد القرآني
-  static Future<void> saveQuranProgress(int lastVerseIndex) async {
+  Future<String?> getUserName() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('last_verse_index', lastVerseIndex);
+    return prefs.getString('fullName');
+  }
+
+  // --- عدد الختمات المكتملة ---
+  static Future<int> getCompletedKhatmasCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('khatmas_count') ?? 0;
+  }
+
+  static Future<void> incrementKhatmasCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    int current = prefs.getInt('khatmas_count') ?? 0;
+    await prefs.setInt('khatmas_count', current + 1);
+  }
+
+  // --- فصل تقدم الختمة ---
+  static Future<void> savePrayerProgress(int lastVerseIndex) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_verse_index_prayer', lastVerseIndex);
+  }
+
+  static Future<int> getPrayerProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('last_verse_index_prayer') ?? 0;
+  }
+
+  static Future<void> saveReadingProgress(int lastVerseIndex) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_verse_index_reading', lastVerseIndex);
+  }
+
+  static Future<int> getReadingProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('last_verse_index_reading') ?? 0;
+  }
+
+  static Future<void> saveQuranProgress(int lastVerseIndex) async {
+    await savePrayerProgress(lastVerseIndex);
   }
 
   static Future<int> getQuranProgress() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('last_verse_index') ?? 0;
+    return await getPrayerProgress();
   }
 
-  // ميزات تتبع الصلوات المكتملة
+  // --- تتبع الصلوات المكتملة ---
   static Future<void> markPrayerAsCompleted(String prayerNameInEnglish) async {
     final prefs = await SharedPreferences.getInstance();
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());

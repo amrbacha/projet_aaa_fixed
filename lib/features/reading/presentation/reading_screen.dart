@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:projet_aaa/core/models/quran_data.dart';
-import 'package:projet_aaa/core/services/quran_service.dart';
-import 'package:projet_aaa/core/services/local_storage_service.dart';
-import 'package:projet_aaa/core/services/smart_quran_service.dart';
-import 'package:projet_aaa/core/providers/audio_provider.dart';
+import 'package:projet_aaa_fixed/core/models/quran_data.dart';
+import 'package:projet_aaa_fixed/core/services/quran_service.dart';
+import 'package:projet_aaa_fixed/core/services/local_storage_service.dart';
+import 'package:projet_aaa_fixed/core/services/smart_quran_service.dart';
+import 'package:projet_aaa_fixed/core/providers/audio_provider.dart';
+import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
 
 class ReadingScreen extends StatefulWidget {
   const ReadingScreen({super.key});
@@ -67,7 +68,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
     _smartService.stopListening();
     _audioSubscription?.cancel();
     _pageFlipTimer?.cancel();
-    setState(() { _hasError = false; _currentVoiceInput = ""; });
+    if (mounted) setState(() { _hasError = false; _currentVoiceInput = ""; });
 
     await audio.playVerse(ayah.surahNumber, ayah.ayahNumber);
     await LocalStorageService.saveQuranProgress(_currentIndex);
@@ -83,7 +84,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
   void _triggerPageFlipDelay() {
     _pageFlipTimer?.cancel();
-    int delayMs = (1000 / _pageFlipSpeed).round();
+    int delayMs = (2000 / _pageFlipSpeed).round();
     _pageFlipTimer = Timer(Duration(milliseconds: delayMs), () => _nextAyah());
   }
 
@@ -91,12 +92,12 @@ class _ReadingScreenState extends State<ReadingScreen> {
     await _smartService.startListening((text) {
       if (!mounted) return;
       setState(() => _currentVoiceInput = text);
-      if (text.isNotEmpty && _smartService.checkSimilarity(_allVerses[_currentIndex].text, text) > 0.6) {
+      if (text.isNotEmpty && _smartService.checkSimilarity(_allVerses[_currentIndex].text, text) > 0.75) {
         _nextAyah();
       }
     });
     
-    _pageFlipTimer = Timer(const Duration(seconds: 8), () {
+    _pageFlipTimer = Timer(const Duration(seconds: 12), () {
       if (mounted && _isSmartMentorEnabled && _currentVoiceInput.isEmpty) {
         _handleRecitationError();
       }
@@ -107,11 +108,8 @@ class _ReadingScreenState extends State<ReadingScreen> {
     if (_hasError) return;
     setState(() => _hasError = true);
     final audio = Provider.of<AudioProvider>(context, listen: false);
-    final ayah = _allVerses[_currentIndex];
-    audio.playVerse(ayah.surahNumber, ayah.ayahNumber);
-    
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أعد القراءة مع المقرئ لتصحيح النطق', textAlign: TextAlign.center), backgroundColor: Colors.redAccent, duration: Duration(seconds: 2)));
-    Future.delayed(const Duration(seconds: 3), () { if (mounted) setState(() => _hasError = false); });
+    audio.playVerse(_allVerses[_currentIndex].surahNumber, _allVerses[_currentIndex].ayahNumber);
+    Future.delayed(const Duration(seconds: 4), () { if (mounted) setState(() => _hasError = false); });
   }
 
   void _nextAyah() {
@@ -133,162 +131,212 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_isLoading) return const Scaffold(backgroundColor: Colors.black, body: Center(child: CircularProgressIndicator(color: Color(0xFFF5A623))));
     final ayah = _allVerses[_currentIndex];
     final audio = Provider.of<AudioProvider>(context);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF1F8E9),
-      body: Stack(
+    return IslamicBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: _buildProfessionalAppBar(ayah),
+        body: Column(
+          children: [
+            const SizedBox(height: 10),
+            _buildSmartStatusIndicator(),
+            _buildAyahDisplay(ayah),
+            _buildSmartControlPanel(audio),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmartStatusIndicator() {
+    if (!_isSmartMentorEnabled) return const SizedBox(height: 40);
+    
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 500),
+      margin: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        color: _hasError ? Colors.red.withOpacity(0.2) : (_currentVoiceInput.isNotEmpty ? Colors.green.withOpacity(0.2) : Colors.blue.withOpacity(0.2)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _hasError ? Colors.redAccent : (_currentVoiceInput.isNotEmpty ? Colors.greenAccent : Colors.blueAccent), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Positioned.fill(top: 5, bottom: 95, child: CustomPaint(painter: LuxuryIslamicFramePainter())),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 10, left: 45, right: 45),
-                  child: _buildSurahCombinedHeader(ayah),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 0),
-                  child: Row(
-                    children: [
-                      IconButton(icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1B5E20), size: 20), onPressed: _previousAyah),
-                      Expanded(child: Text("سورة ${ayah.surahName}", textAlign: TextAlign.center, style: GoogleFonts.amiri(fontSize: 28, fontWeight: FontWeight.bold, color: const Color(0xFF1B5E20)))),
-                      IconButton(icon: const Icon(Icons.close, color: Color(0xFF1B5E20), size: 24), onPressed: () => context.pop()),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 55),
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (_isSmartMentorEnabled)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Text(_hasError ? "⚠️ أعد مع المقرئ" : "🎤 استماع نشط...", 
-                                style: TextStyle(color: _hasError ? Colors.red : Colors.blue, fontWeight: FontWeight.bold, fontSize: 12)),
-                            ),
-                          RichText(
-                            textAlign: TextAlign.center,
-                            text: TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: "(${_toArabicDigits(ayah.ayahNumber)}) ",
-                                  style: GoogleFonts.amiri(fontSize: 24, color: const Color(0xFFB71C1C), fontWeight: FontWeight.bold),
-                                ),
-                                TextSpan(
-                                  text: ayah.text,
-                                  style: GoogleFonts.amiri(fontSize: 32, height: 1.8, color: _hasError ? Colors.red : const Color(0xFF1B5E20), fontWeight: FontWeight.w500),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 40),
-                        ],
-                      ),
+          Icon(_hasError ? Icons.warning_amber_rounded : Icons.mic, 
+               color: _hasError ? Colors.redAccent : (_currentVoiceInput.isNotEmpty ? Colors.greenAccent : Colors.blueAccent), size: 18),
+          const SizedBox(width: 10),
+          Text(
+            _hasError ? "لم نلتقط القراءة، استمع ثم أعد" : (_currentVoiceInput.isNotEmpty ? "قراءة صحيحة.. جاري الانتقال" : "أنيس يستمع لتلاوتك الآن..."),
+            style: GoogleFonts.amiri(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildProfessionalAppBar(Ayah ayah) {
+    int estimatedJuz = (ayah.surahNumber / 4).ceil().clamp(1, 30);
+    return AppBar(
+      backgroundColor: Colors.black45,
+      elevation: 0,
+      centerTitle: true,
+      leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white70), onPressed: () => context.pop()),
+      title: Column(
+        children: [
+          Text("سورة ${ayah.surahName}", style: GoogleFonts.amiri(fontSize: 22, fontWeight: FontWeight.bold, color: const Color(0xFFF5A623))),
+          Text("الجزء ${_toArabicDigits(estimatedJuz)} - آية ${_toArabicDigits(ayah.ayahNumber)}", 
+            style: GoogleFonts.notoSans(fontSize: 12, color: Colors.white70)),
+        ],
+      ),
+      actions: [
+        IconButton(icon: const Icon(Icons.info_outline, color: Colors.white38), onPressed: () {}),
+      ],
+    );
+  }
+
+  Widget _buildAyahDisplay(Ayah ayah) {
+    return Expanded(
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+        padding: const EdgeInsets.all(25),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: const Color(0xFFF5A623).withOpacity(0.3), width: 1.5),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, spreadRadius: 5)],
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Text(
+                    ayah.text,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.amiri(
+                      fontSize: ayah.text.length > 100 ? 28 : 34, 
+                      height: 1.7,
+                      color: _hasError ? Colors.redAccent : Colors.white,
+                      fontWeight: FontWeight.bold,
+                      shadows: [const Shadow(color: Colors.black, blurRadius: 10)],
                     ),
                   ),
                 ),
-                _buildUnifiedBottomPanel(audio),
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: const Color(0xFFF5A623).withOpacity(0.5)),
+              ),
+              child: Text(_toArabicDigits(ayah.ayahNumber), style: GoogleFonts.amiri(color: const Color(0xFFF5A623), fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSurahCombinedHeader(Ayah ayah) {
-    int estimatedJuz = (ayah.surahNumber / 4).ceil().clamp(1, 30);
+  Widget _buildSmartControlPanel(AudioProvider audio) {
     return Container(
-      width: double.infinity, height: 85,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CustomPaint(size: const Size(double.infinity, 85), painter: SurahTitlePainter()),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("الجزء ${_toArabicDigits(estimatedJuz)}", style: GoogleFonts.amiri(fontSize: 14, color: const Color(0xFF1B5E20), fontWeight: FontWeight.bold)),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text("ختمة القراءة", textAlign: TextAlign.center, style: GoogleFonts.amiri(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFFB71C1C))),
-                      Text("آية ${_toArabicDigits(ayah.ayahNumber)}", style: GoogleFonts.amiri(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF1B5E20))),
-                    ],
-                  ),
-                ),
-                Text("سورة ${ayah.surahName}", style: GoogleFonts.amiri(fontSize: 14, color: const Color(0xFF1B5E20), fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-        ],
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.black87,
+        borderRadius: BorderRadius.circular(40),
+        border: Border.all(color: Colors.white10),
       ),
-    );
-  }
-
-  Widget _buildUnifiedBottomPanel(AudioProvider audio) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 15),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: const Color(0xFF1B5E20).withOpacity(0.9), borderRadius: BorderRadius.circular(20)),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(children: [
-            const Text('المعلم', style: TextStyle(color: Colors.white, fontSize: 11)),
-            Transform.scale(scale: 0.7, child: Switch(value: _isSmartMentorEnabled, onChanged: (v) { setState(() => _isSmartMentorEnabled = v); _handleVerseActivation(); }, activeColor: Colors.orangeAccent)),
-          ]),
-          Container(height: 20, width: 1, color: Colors.white24),
-          PopupMenuButton<double>(
-            initialValue: audio.playbackRate,
-            onSelected: (v) => audio.setPlaybackRate(v),
-            child: Row(children: [const Icon(Icons.speed, color: Colors.white, size: 16), Text(' ${audio.playbackRate}x', style: const TextStyle(color: Colors.white, fontSize: 11))]),
-            itemBuilder: (context) => [0.5, 0.75, 1.0, 1.25, 1.5].map((s) => PopupMenuItem(value: s, child: Text('${s}x'))).toList(),
+          _buildControlIcon(_isSmartMentorEnabled ? Icons.mic : Icons.mic_off, () {
+            setState(() => _isSmartMentorEnabled = !_isSmartMentorEnabled);
+            _handleVerseActivation();
+          }, isActive: _isSmartMentorEnabled),
+          
+          _buildActionBtn(Icons.skip_previous, _previousAyah),
+          
+          GestureDetector(
+            onTap: _nextAyah,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: const BoxDecoration(color: Color(0xFFF5A623), shape: BoxShape.circle),
+              child: const Icon(Icons.arrow_forward_ios, color: Colors.black, size: 24),
+            ),
           ),
-          Container(height: 20, width: 1, color: Colors.white24),
-          PopupMenuButton<double>(
-            initialValue: _pageFlipSpeed,
-            onSelected: (v) => setState(() => _pageFlipSpeed = v),
-            child: Row(children: [const Icon(Icons.auto_awesome_motion, color: Colors.white, size: 16), Text(' قلب:${_pageFlipSpeed}x', style: const TextStyle(color: Colors.white, fontSize: 11))]),
-            itemBuilder: (context) => [0.5, 1.0, 2.0, 3.0, 5.0].map((s) => PopupMenuItem(value: s, child: Text('سرعة ${s}x'))).toList(),
+          
+          _buildActionBtn(Icons.speed, () => _showSpeedMenu(audio)),
+          
+          _buildControlIcon(Icons.auto_stories, () => _showPageFlipMenu(), isActive: _pageFlipSpeed > 1.0),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlIcon(IconData icon, VoidCallback onTap, {bool isActive = false}) {
+    return IconButton(
+      icon: Icon(icon, color: isActive ? const Color(0xFFF5A623) : Colors.white60, size: 22),
+      onPressed: onTap,
+    );
+  }
+
+  Widget _buildActionBtn(IconData icon, VoidCallback onTap) {
+    return IconButton(icon: Icon(icon, color: Colors.white70, size: 22), onPressed: onTap);
+  }
+
+  void _showSpeedMenu(AudioProvider audio) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0D3B2E),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (context) => _buildOptionMenu("سرعة المقرئ", [0.5, 0.75, 1.0, 1.25, 1.5], (v) => audio.setPlaybackRate(v), audio.playbackRate),
+    );
+  }
+
+  void _showPageFlipMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0D3B2E),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (context) {
+        return _buildOptionMenu("سرعة القلب التلقائي", [0.5, 1.0, 2.0, 3.0], (v) => setState(() => _pageFlipSpeed = v), _pageFlipSpeed);
+      }
+    );
+  }
+
+  Widget _buildOptionMenu(String title, List<double> options, Function(double) onSelect, double currentVal) {
+    return Padding(
+      padding: const EdgeInsets.all(25),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(title, style: GoogleFonts.amiri(color: const Color(0xFFF5A623), fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 15,
+            runSpacing: 15,
+            children: options.map((o) => ChoiceChip(
+              backgroundColor: Colors.white10,
+              selectedColor: const Color(0xFFF5A623),
+              label: Text("${o}x", style: TextStyle(color: currentVal == o ? Colors.black : Colors.white)),
+              selected: currentVal == o,
+              onSelected: (selected) { if (selected) { onSelect(o); context.pop(); } },
+            )).toList(),
           ),
-          Container(height: 20, width: 1, color: Colors.white24),
-          IconButton(onPressed: _nextAyah, icon: const Icon(Icons.skip_next, color: Color(0xFFC19A6B), size: 28)),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
   String _toArabicDigits(int n) => n.toString().split('').map((c) => '٠١٢٣٤٥٦٧٨٩'[int.parse(c)]).join();
-}
-
-class LuxuryIslamicFramePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gold = Paint()..color = const Color(0xFFC19A6B)..style = PaintingStyle.stroke..strokeWidth = 2;
-    canvas.drawRect(Rect.fromLTWH(10, 10, size.width - 20, size.height - 20), gold);
-  }
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
-}
-
-class SurahTitlePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gold = Paint()..color = const Color(0xFFC19A6B)..style = PaintingStyle.stroke..strokeWidth = 2;
-    final bg = Paint()..color = const Color(0xFFF1F8E9)..style = PaintingStyle.fill;
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bg);
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), gold);
-  }
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

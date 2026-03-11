@@ -3,7 +3,8 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'dart:io';
-import '../../features/adhkar/data/adhkar_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -46,14 +47,23 @@ class NotificationService {
     );
 
     if (Platform.isAndroid) {
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.requestNotificationsPermission();
+      // طلب إذن الإشعارات لأندرويد 13+
+      await Permission.notification.request();
+      
+      // طلب إذن التنبيهات الدقيقة لأندرويد 12+ لتجنب الانهيار
+      if (await Permission.scheduleExactAlarm.isDenied) {
+        // يمكنك توجيه المستخدم لفتح الإعدادات أو المحاولة مرة أخرى لاحقاً
+        // حالياً سنكتفي بطلب الإذن
+        await Permission.scheduleExactAlarm.request();
+      }
     }
 
     // جدولة أذكار الصباح والمساء تلقائياً عند التشغيل
-    await scheduleDailyAdhkarNotifications();
+    try {
+      await scheduleDailyAdhkarNotifications();
+    } catch (e) {
+      debugPrint("Error scheduling notifications during init: $e");
+    }
   }
 
   /// جدولة تنبيه للصلاة
@@ -66,36 +76,58 @@ class NotificationService {
     final tz.TZDateTime tzScheduledDate = tz.TZDateTime.from(scheduledDate, tz.local);
     if (tzScheduledDate.isBefore(tz.TZDateTime.now(tz.local))) return;
 
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tzScheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'adhan_channel',
-          'تنبيهات الأذان',
-          channelDescription: 'قناة مخصصة لتنبيهات أوقات الصلاة',
-          importance: Importance.max,
-          priority: Priority.high,
-          sound: RawResourceAndroidNotificationSound('adhan'),
-          playSound: true,
+    try {
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzScheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'adhan_channel',
+            'تنبيهات الأذان',
+            channelDescription: 'قناة مخصصة لتنبيهات أوقات الصلاة',
+            importance: Importance.max,
+            priority: Priority.high,
+            sound: RawResourceAndroidNotificationSound('adhan'),
+            playSound: true,
+          ),
+          iOS: DarwinNotificationDetails(
+            sound: 'adhan.caf',
+            presentSound: true,
+          ),
         ),
-        iOS: DarwinNotificationDetails(
-          sound: 'adhan.caf',
-          presentSound: true,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } catch (e) {
+      // إذا فشلت الجدولة الدقيقة، نستخدم الجدولة التقريبية كبديل لتجنب الانهيار
+      debugPrint("Exact schedule failed, using inexact: $e");
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzScheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'adhan_channel',
+            'تنبيهات الأذان (تقريبية)',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
         ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    }
   }
 
   /// جدولة أذكار الصباح والمساء يومياً
   Future<void> scheduleDailyAdhkarNotifications() async {
-    // 1. أذكار الصباح (مثلاً الساعة 7:00 صباحاً)
     await _scheduleDailyNotification(
       id: 1001,
       title: 'أذكار الصباح ☀️',
@@ -104,7 +136,6 @@ class NotificationService {
       minute: 0,
     );
 
-    // 2. أذكار المساء (مثلاً الساعة 17:00 - الخامسة مساءً)
     await _scheduleDailyNotification(
       id: 1002,
       title: 'أذكار المساء 🌙',
@@ -128,29 +159,46 @@ class NotificationService {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
 
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'adhkar_channel',
-          'تنبيهات الأذكار',
-          channelDescription: 'تذكير يومي بأذكار الصباح والمساء',
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
+    try {
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'adhkar_channel',
+            'تنبيهات الأذكار',
+            channelDescription: 'تذكير يومي بأذكار الصباح والمساء',
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } catch (e) {
+      debugPrint("Daily notification schedule failed: $e");
+      // بديل تقريبي
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails('adhkar_channel', 'تنبيهات الأذكار (تقريبية)'),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    }
   }
 
-  /// إلغاء جميع التنبيهات
   Future<void> cancelAllNotifications() async {
     await flutterLocalNotificationsPlugin.cancelAll();
   }

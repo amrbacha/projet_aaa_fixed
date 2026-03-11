@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:projet_aaa/core/providers/theme_provider.dart';
-import 'package:projet_aaa/models/settings_model.dart';
+import 'package:projet_aaa_fixed/core/providers/theme_provider.dart';
+import 'package:projet_aaa_fixed/models/settings_model.dart';
 
 class IslamicBackground extends StatelessWidget {
   final Widget child;

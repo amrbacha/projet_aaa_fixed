@@ -1,9 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:projet_aaa/core/data/surah_names.dart';
-import 'package:projet_aaa/widgets/islamic_background.dart';
+import 'package:projet_aaa_fixed/core/data/surah_names.dart';
+import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
+import 'package:projet_aaa_fixed/core/services/assistant_service.dart';
 
 class TafseerScreen extends StatefulWidget {
   const TafseerScreen({super.key});
@@ -15,6 +17,9 @@ class TafseerScreen extends StatefulWidget {
 class _TafseerScreenState extends State<TafseerScreen> {
   int? lastSurah;
   String? lastSurahName;
+  final AssistantService _anis = AssistantService();
+  String _searchQuery = "";
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -35,166 +40,192 @@ class _TafseerScreenState extends State<TafseerScreen> {
     return IslamicBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text('التفسير والتدبر', 
-            style: GoogleFonts.amiri(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
-          centerTitle: true,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
-            onPressed: () => context.pop(),
-          ),
-          actions: [
-            IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: () {}),
-          ],
-        ),
+        appBar: _buildAppBar(),
         body: Column(
           children: [
-            _buildQuickAccessSection(context),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Text('فهرس السور', 
-                  style: GoogleFonts.amiri(color: const Color(0xFFC19A6B), fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: surahNames.length,
-                itemBuilder: (context, index) {
-                  return _buildSurahItem(context, index);
-                },
-              ),
-            ),
+            if (!_isSearching) _buildHeroSection(),
+            _buildSectionHeader(),
+            Expanded(child: _buildSurahList()),
           ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: const Color(0xFFF5A623),
+          child: const Icon(Icons.lightbulb_outline, color: Colors.black),
+          onPressed: () => _anis.speak("هنا يمكنك الإبحار في معاني القرآن وكتابة خواطرك الإيمانية."),
         ),
       ),
     );
   }
 
-  Widget _buildQuickAccessSection(BuildContext context) {
-    return Container(
-      height: 180,
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Colors.black26,
+      elevation: 0,
+      centerTitle: true,
+      title: _isSearching 
+        ? TextField(
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(hintText: "ابحث عن سورة...", hintStyle: TextStyle(color: Colors.white54), border: InputBorder.none),
+            onChanged: (v) => setState(() => _searchQuery = v),
+          )
+        : Text('التفسير والتدبر', style: GoogleFonts.amiri(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+      leading: IconButton(
+        icon: Icon(_isSearching ? Icons.close : Icons.arrow_back_ios, color: Colors.white70),
+        onPressed: () {
+          if (_isSearching) setState(() { _isSearching = false; _searchQuery = ""; });
+          else context.pop();
+        },
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(_isSearching ? Icons.check : Icons.search, color: const Color(0xFFF5A623)),
+          onPressed: () => setState(() => _isSearching = !_isSearching),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeroSection() {
+    return SizedBox(
+      height: 200,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         children: [
-          _buildQuickCard(
-            context,
+          _buildHeroCard(
             title: 'تدبر اليوم',
             subtitle: 'سورة الملك، آية ١٥',
             icon: Icons.auto_awesome,
-            color: const Color(0xFFF5A623),
-            onTap: () {
-               // مثال: الانتقال لآية معينة لتدبر اليوم
-               context.push('/surah-tafseer', extra: {
-                'surahNumber': 67,
-                'surahName': 'الملك',
-              });
-            }
+            colors: [const Color(0xFFF5A623), const Color(0xFFD48106)],
+            onTap: () => context.push('/surah-tafseer', extra: {'surahNumber': 67, 'surahName': 'الملك'}),
           ),
-          _buildQuickCard(
-            context,
+          _buildHeroCard(
             title: 'آخر موضع',
-            subtitle: lastSurahName != null ? 'سورة $lastSurahName' : 'لا يوجد سجل حالياً',
-            icon: Icons.history,
-            color: const Color(0xFF1ABC9C),
-            onTap: lastSurah != null ? () {
-               context.push('/surah-tafseer', extra: {
-                'surahNumber': lastSurah,
-                'surahName': lastSurahName,
-              });
-            } : null,
+            subtitle: lastSurahName != null ? 'سورة $lastSurahName' : 'ابدأ القراءة الآن',
+            icon: Icons.history_toggle_off,
+            colors: [const Color(0xFF1ABC9C), const Color(0xFF16A085)],
+            onTap: lastSurah != null ? () => context.push('/surah-tafseer', extra: {'surahNumber': lastSurah, 'surahName': lastSurahName}) : null,
           ),
-          _buildQuickCard(
-            context,
+          _buildHeroCard(
             title: 'خواطري',
-            subtitle: 'عرض الملاحظات',
-            icon: Icons.edit_note,
-            color: const Color(0xFFE74C3C),
-            onTap: () {
-               // سيتم بناء شاشة قائمة الخواطر لاحقاً
-               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سيتم فتح سجل الخواطر قريباً')));
-            }
+            subtitle: 'سجل تأملاتك',
+            icon: Icons.edit_note_rounded,
+            colors: [const Color(0xFFE74C3C), const Color(0xFFC0392B)],
+            onTap: () => _anis.speak("سجل الخواطر سيتاح قريباً في التحديث القادم."),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickCard(BuildContext context, {
-    required String title, 
-    required String subtitle, 
-    required IconData icon, 
-    required Color color,
-    VoidCallback? onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        width: 160,
-        margin: const EdgeInsets.only(left: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 30),
-            const SizedBox(height: 12),
-            Text(title, style: GoogleFonts.amiri(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-            Text(subtitle, style: GoogleFonts.amiri(color: Colors.white70, fontSize: 12)),
-          ],
+  Widget _buildHeroCard({required String title, required String subtitle, required IconData icon, required List<Color> colors, VoidCallback? onTap}) {
+    return Container(
+      width: 170,
+      margin: const EdgeInsets.only(left: 15),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(25),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(25),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    colors[0].withOpacity(0.7),
+                    colors[1].withOpacity(0.4),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                boxShadow: [BoxShadow(color: colors[0].withOpacity(0.2), blurRadius: 12, offset: const Offset(0, 6))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Icon(icon, color: Colors.white, size: 35),
+                  const Spacer(),
+                  Text(title, style: GoogleFonts.amiri(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+                  Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildSurahItem(BuildContext context, int index) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+  Widget _buildSectionHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 15),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('فهرس السور', style: GoogleFonts.amiri(color: const Color(0xFFF5A623), fontSize: 20, fontWeight: FontWeight.bold)),
+          const Icon(Icons.sort_rounded, color: Colors.white38, size: 20),
+        ],
       ),
-      child: ListTile(
-        onTap: () async {
-          // حفظ الموضع الأخير
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setInt('last_tafseer_surah', index + 1);
-          await prefs.setString('last_tafseer_surah_name', surahNames[index]);
-          
-          if (!mounted) return;
-          context.push('/surah-tafseer', extra: {
-            'surahNumber': index + 1,
-            'surahName': surahNames[index],
-          });
-        },
-        leading: Container(
-          width: 35,
-          height: 35,
-          decoration: BoxDecoration(
-            color: const Color(0xFFC19A6B).withOpacity(0.2),
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFFC19A6B).withOpacity(0.4)),
-          ),
-          child: Center(
-            child: Text('${index + 1}', 
-              style: GoogleFonts.notoSans(color: const Color(0xFFC19A6B), fontSize: 12, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _buildSurahList() {
+    final filteredSurahs = surahNames.where((name) => name.contains(_searchQuery)).toList();
+    
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: filteredSurahs.length,
+      itemBuilder: (context, index) {
+        final actualIndex = surahNames.indexOf(filteredSurahs[index]);
+        return _buildSurahItem(actualIndex, filteredSurahs[index]);
+      },
+    );
+  }
+
+  Widget _buildSurahItem(int index, String name) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+              onTap: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setInt('last_tafseer_surah', index + 1);
+                await prefs.setString('last_tafseer_surah_name', name);
+                if (mounted) context.push('/surah-tafseer', extra: {'surahNumber': index + 1, 'surahName': name});
+              },
+              leading: Container(
+                width: 45,
+                height: 45,
+                decoration: BoxDecoration(
+                  image: const DecorationImage(image: AssetImage('assets/images/surah_frame.png'), opacity: 0.5),
+                  color: Colors.white.withOpacity(0.05),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text('${index + 1}', style: GoogleFonts.notoSans(color: const Color(0xFFF5A623), fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              title: Text(name, style: GoogleFonts.amiri(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
+              subtitle: Text("سورة ${index % 2 == 0 ? 'مكية' : 'مدنية'} • ٧ آيات", style: const TextStyle(color: Colors.white38, fontSize: 11)),
+              trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white12, size: 16),
+            ),
           ),
         ),
-        title: Text(surahNames[index], 
-          style: GoogleFonts.amiri(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white38, size: 14),
       ),
     );
   }

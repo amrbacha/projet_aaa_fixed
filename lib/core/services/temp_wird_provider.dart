@@ -1,4 +1,4 @@
-import 'package:projet_aaa/models/quran_data.dart';
+import 'package:projet_aaa_fixed/models/quran_data.dart';
 
 // A temporary, standalone provider to return a hardcoded wird.
 // This has no dependencies on other services.

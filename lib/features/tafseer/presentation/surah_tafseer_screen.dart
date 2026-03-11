@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import 'package:projet_aaa/core/models/quran_data.dart';
-import 'package:projet_aaa/core/services/quran_service.dart';
-import 'package:projet_aaa/widgets/islamic_background.dart';
+import '../../../l10n/app_localizations.dart';
+import 'package:projet_aaa_fixed/core/models/quran_data.dart';
+import 'package:projet_aaa_fixed/core/services/quran_service.dart';
+import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
 
 class SurahTafseerScreen extends StatefulWidget {
   final int surahNumber;
@@ -30,7 +31,6 @@ class _SurahTafseerScreenState extends State<SurahTafseerScreen> {
   }
 
   Future<void> _loadVerses() async {
-    // جلب بيانات القرآن والبحث عن السورة المطلوبة
     final quran = await QuranService().getAllVerses(excludeFatiha: false);
     final surahVerses = quran.where((a) => a.surahNumber == widget.surahNumber).toList();
     
@@ -44,6 +44,8 @@ class _SurahTafseerScreenState extends State<SurahTafseerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return IslamicBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -65,14 +67,14 @@ class _SurahTafseerScreenState extends State<SurahTafseerScreen> {
               itemCount: verses?.length ?? 0,
               itemBuilder: (context, index) {
                 final ayah = verses![index];
-                return _buildAyahCard(context, ayah);
+                return _buildAyahCard(context, ayah, l10n);
               },
             ),
       ),
     );
   }
 
-  Widget _buildAyahCard(BuildContext context, Ayah ayah) {
+  Widget _buildAyahCard(BuildContext context, Ayah ayah, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -103,11 +105,11 @@ class _SurahTafseerScreenState extends State<SurahTafseerScreen> {
                   color: const Color(0xFFC19A6B).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(5),
                 ),
-                child: Text('آية ${ayah.ayahNumber}', 
+                child: Text(l10n.ayahNumber(ayah.ayahNumber), 
                   style: GoogleFonts.notoSans(color: const Color(0xFFC19A6B), fontSize: 10)),
               ),
               const Spacer(),
-              Text('انقر للتدبر والتفسير', 
+              Text(l10n.clickForTadabbur,
                 style: GoogleFonts.amiri(color: Colors.white38, fontSize: 12)),
             ],
           ),

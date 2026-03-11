@@ -6,8 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:projet_aaa/core/services/prayer_times_service.dart';
-import 'package:projet_aaa/widgets/islamic_background.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../core/services/prayer_times_service.dart';
+import '../../../widgets/islamic_background.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class QiblaScreen extends StatefulWidget {
@@ -65,12 +66,13 @@ class _QiblaScreenState extends State<QiblaScreen> {
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
+    final l10n = AppLocalizations.of(context)!;
 
     return IslamicBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: Text('اتجاه القبلة', 
+          title: Text(l10n.qiblaDirection, 
             style: GoogleFonts.amiri(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
           centerTitle: true,
           backgroundColor: Colors.transparent,
@@ -83,16 +85,16 @@ class _QiblaScreenState extends State<QiblaScreen> {
         body: _isLoading 
           ? const Center(child: CircularProgressIndicator(color: Color(0xFFF5A623)))
           : !_hasPermission 
-            ? _buildPermissionError()
+            ? _buildPermissionError(l10n)
             : Column(
                 children: [
-                  _buildInfoCard(),
+                  _buildInfoCard(l10n),
                   Expanded(
                     child: Center(
-                      child: _buildCompassSection(screenWidth),
+                      child: _buildCompassSection(screenWidth, l10n),
                     ),
                   ),
-                  _buildAccuracyStatus(),
+                  _buildAccuracyStatus(l10n),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -100,27 +102,27 @@ class _QiblaScreenState extends State<QiblaScreen> {
     );
   }
 
-  Widget _buildPermissionError() {
+  Widget _buildPermissionError(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.location_off, color: Colors.redAccent, size: 60),
           const SizedBox(height: 20),
-          Text("يجب تفعيل الوصول للموقع\nلحساب اتجاه القبلة", 
+          Text(l10n.locationUpdateError, 
             textAlign: TextAlign.center,
             style: GoogleFonts.amiri(color: Colors.white, fontSize: 18)),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _checkPermissionsAndInit,
-            child: const Text("تفعيل الآن"),
+            child: Text(l10n.updateNow),
           )
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard() {
+  Widget _buildInfoCard(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       padding: const EdgeInsets.all(20),
@@ -132,9 +134,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem("المسافة إلى مكة", "${_calculateDistance().toInt()} كم"),
+          _buildStatItem(l10n.locationService, "${_calculateDistance().toInt()} km"),
           Container(width: 1, height: 40, color: Colors.white24),
-          _buildStatItem("زاوية القبلة", "${_qiblaDirection?.toInt()}°"),
+          _buildStatItem(l10n.qiblaDirection, "${_qiblaDirection?.toInt()}°"),
         ],
       ),
     );
@@ -149,12 +151,12 @@ class _QiblaScreenState extends State<QiblaScreen> {
     );
   }
 
-  Widget _buildCompassSection(double screenWidth) {
+  Widget _buildCompassSection(double screenWidth, AppLocalizations l10n) {
     return StreamBuilder<CompassEvent>(
       stream: FlutterCompass.events,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Center(child: Text("خطأ في قراءة الحساسات", style: TextStyle(color: Colors.white)));
+          return Center(child: Text(l10n.locationUpdateError, style: const TextStyle(color: Colors.white)));
         }
 
         if (!snapshot.hasData || snapshot.data!.heading == null) {
@@ -164,19 +166,18 @@ class _QiblaScreenState extends State<QiblaScreen> {
               children: [
                 CircularProgressIndicator(color: Color(0xFFF5A623)),
                 SizedBox(height: 20),
-                Text("جاري استشعار الحركة...", style: TextStyle(color: Colors.white)),
+                Text("...", style: TextStyle(color: Colors.white)),
               ],
             ),
           );
         }
 
         double deviceHeading = snapshot.data!.heading!;
-        // تأكد من تحديث القبلة إذا لم تكن موجودة
         if (_qiblaDirection == null) return const Center(child: CircularProgressIndicator());
 
         double diff = (_qiblaDirection! - deviceHeading + 360) % 360;
         
-        bool aligned = diff < 10 || diff > 350; // جعل مجال المحاذاة أوسع قليلاً لسهولة الاستخدام
+        bool aligned = diff < 10 || diff > 350;
         if (aligned && !_isAligned) {
           HapticFeedback.heavyImpact();
           _isAligned = true;
@@ -190,7 +191,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
         return Stack(
           alignment: Alignment.center,
           children: [
-            // هالة ضوئية عند المحاذاة
             AnimatedOpacity(
               duration: const Duration(milliseconds: 500),
               opacity: aligned ? 1.0 : 0.0,
@@ -205,7 +205,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
               ),
             ),
             
-            // قرص البوصلة (يدور مع الهاتف)
             Transform.rotate(
               angle: (deviceHeading * (math.pi / 180) * -1),
               child: Image.asset(
@@ -219,7 +218,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
               ),
             ),
 
-            // إبرة الكعبة (تشير دائماً لمكة)
             Transform.rotate(
               angle: (diff * (math.pi / 180)),
               child: Image.asset(
@@ -229,13 +227,12 @@ class _QiblaScreenState extends State<QiblaScreen> {
               ),
             ),
 
-            // مؤشر الدرجة في الوسط
             Positioned(
               bottom: dialSize * 0.1,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                 decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(15)),
-                child: Text(aligned ? "القبلة" : "${diff.toInt()}°",
+                child: Text(aligned ? l10n.qiblaDirection : "${diff.toInt()}°",
                   style: GoogleFonts.notoSans(
                     color: aligned ? Colors.greenAccent : Colors.white,
                     fontSize: 22,
@@ -249,7 +246,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
     );
   }
 
-  Widget _buildAccuracyStatus() {
+  Widget _buildAccuracyStatus(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       margin: const EdgeInsets.symmetric(horizontal: 40),
@@ -263,7 +260,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
           Icon(Icons.sensors, color: _isAligned ? Colors.green : Colors.orangeAccent, size: 18),
           const SizedBox(width: 8),
           Text(
-            _isAligned ? "القبلة مضبوطة" : "حرك الهاتف ببطء",
+            _isAligned ? l10n.saveSuccess : "...", // سيتم استكمال نصوص الحالة
             style: GoogleFonts.amiri(color: Colors.white70, fontSize: 14),
           ),
         ],

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:projet_aaa/core/services/quran_service.dart';
-import 'package:projet_aaa/core/models/quran_data.dart';
-import 'package:projet_aaa/widgets/islamic_background.dart';
+import 'package:projet_aaa_fixed/core/services/quran_service.dart';
+import 'package:projet_aaa_fixed/core/models/quran_data.dart';
+import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
 
 class MemorizationDashboardScreen extends StatefulWidget {
   const MemorizationDashboardScreen({super.key});

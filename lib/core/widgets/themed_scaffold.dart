@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:projet_aaa/core/services/local_storage_service.dart';
+import 'package:projet_aaa_fixed/core/services/local_storage_service.dart';
 
 class ThemedScaffold extends StatefulWidget {
   final Widget child;

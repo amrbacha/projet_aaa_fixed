@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../widgets/islamic_background.dart';
+import '../../../l10n/app_localizations.dart';
 
 class TasbeehScreen extends StatefulWidget {
   const TasbeehScreen({super.key});
@@ -111,6 +112,8 @@ class _TasbeehScreenState extends State<TasbeehScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    
     return IslamicBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -146,7 +149,7 @@ class _TasbeehScreenState extends State<TasbeehScreen> with SingleTickerProvider
                               children: [
                                 const Icon(Icons.nightlight_round, color: Color(0xFFC19A6B), size: 30),
                                 const SizedBox(width: 10),
-                                Text("التسبيح", 
+                                Text(l10n.tasbeeh, 
                                   style: GoogleFonts.amiri(
                                     fontSize: 48, 
                                     fontWeight: FontWeight.bold, 
@@ -192,7 +195,7 @@ class _TasbeehScreenState extends State<TasbeehScreen> with SingleTickerProvider
                   ),
                 ),
 
-                // 5. الماندالا والعداد (تغيير الخط للأميري واللون للبني)
+                // 5. الماندالا والعداد
                 Positioned(
                   top: sh * 0.32, left: 0, right: 0,
                   child: Stack(
@@ -210,14 +213,14 @@ class _TasbeehScreenState extends State<TasbeehScreen> with SingleTickerProvider
                   ),
                 ),
 
-                // 6. الإحصائيات (تغيير لون الكلمات من الأبيض للبني الخشبي)
+                // 6. الإحصائيات (مترجمة)
                 Positioned(
                   top: sh * 0.60, left: 0, right: 0,
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2), // تغيير الخلفية لتناسب اللون البني
+                        color: Colors.white.withOpacity(0.2), 
                         borderRadius: BorderRadius.circular(25),
                       ),
                       child: RichText(
@@ -225,13 +228,13 @@ class _TasbeehScreenState extends State<TasbeehScreen> with SingleTickerProvider
                           style: GoogleFonts.amiri(
                             fontSize: 18, 
                             fontWeight: FontWeight.bold, 
-                            color: const Color(0xFF42210B), // اللون البني للكتابة
+                            color: const Color(0xFF42210B),
                           ),
                           children: [
-                            const TextSpan(text: "الهدف: "),
-                            TextSpan(text: "$target", style: const TextStyle(color: Color(0xFFB71C1C))), // لون مميز للرقم
+                            TextSpan(text: "${l10n.target}: "),
+                            TextSpan(text: "$target", style: const TextStyle(color: Color(0xFFB71C1C))),
                             const TextSpan(text: "  •  "),
-                            const TextSpan(text: "الدورات: "),
+                            TextSpan(text: "${l10n.cycles}: "),
                             TextSpan(text: "$cycle", style: const TextStyle(color: Color(0xFFB71C1C))),
                           ],
                         ),
@@ -262,14 +265,14 @@ class _TasbeehScreenState extends State<TasbeehScreen> with SingleTickerProvider
                     children: [
                       Expanded(child: GestureDetector(onTap: _reset, child: Image.asset("assets/images/tasbeeh/button_reset.png"))),
                       const SizedBox(width: 20),
-                      Expanded(child: GestureDetector(onTap: _showZikrPicker, child: Image.asset("assets/images/tasbeeh/button_zikr.png"))),
+                      Expanded(child: GestureDetector(onTap: () => _showZikrPicker(l10n), child: Image.asset("assets/images/tasbeeh/button_zikr.png"))),
                     ],
                   ),
                 ),
 
                 // أزرار النظام
                 Positioned(top: 45, left: 15, child: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 24), onPressed: () => context.go('/main-menu'))),
-                Positioned(top: 45, right: 15, child: IconButton(icon: const Icon(Icons.settings, color: Colors.white, size: 28), onPressed: _showSettings)),
+                Positioned(top: 45, right: 15, child: IconButton(icon: const Icon(Icons.settings, color: Colors.white, size: 28), onPressed: () => _showSettings(l10n))),
               ],
             );
           },
@@ -287,7 +290,7 @@ class _TasbeehScreenState extends State<TasbeehScreen> with SingleTickerProvider
     );
   }
 
-  void _showZikrPicker() {
+  void _showZikrPicker(AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0D3B2E),
@@ -297,7 +300,7 @@ class _TasbeehScreenState extends State<TasbeehScreen> with SingleTickerProvider
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text("اختر الذكر", style: GoogleFonts.amiri(fontSize: 24, fontWeight: FontWeight.bold, color: const Color(0xFFC19A6B))),
+            Text(l10n.selectZikr, style: GoogleFonts.amiri(fontSize: 24, fontWeight: FontWeight.bold, color: const Color(0xFFC19A6B))),
             const Divider(color: Colors.white10),
             Flexible(
               child: ListView.builder(
@@ -315,7 +318,7 @@ class _TasbeehScreenState extends State<TasbeehScreen> with SingleTickerProvider
     );
   }
 
-  void _showSettings() {
+  void _showSettings(AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0D3B2E),
@@ -325,11 +328,11 @@ class _TasbeehScreenState extends State<TasbeehScreen> with SingleTickerProvider
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("الإعدادات", style: GoogleFonts.amiri(fontSize: 22, fontWeight: FontWeight.bold, color: const Color(0xFFC19A6B))),
-              SwitchListTile(title: Text("الاهتزاز", style: GoogleFonts.amiri(color: Colors.white)), value: enableHaptics, activeColor: const Color(0xFFC19A6B), onChanged: (v) { setSheet(() => enableHaptics = v); setState(() => enableHaptics = v); _save(); }),
-              SwitchListTile(title: Text("الصوت", style: GoogleFonts.amiri(color: Colors.white)), value: enableSound, activeColor: const Color(0xFFC19A6B), onChanged: (v) { setSheet(() => enableSound = v); setState(() => enableSound = v); _save(); }),
+              Text(l10n.settings, style: GoogleFonts.amiri(fontSize: 22, fontWeight: FontWeight.bold, color: const Color(0xFFC19A6B))),
+              SwitchListTile(title: Text(l10n.vibration, style: GoogleFonts.amiri(color: Colors.white)), value: enableHaptics, activeColor: const Color(0xFFC19A6B), onChanged: (v) { setSheet(() => enableHaptics = v); setState(() => enableHaptics = v); _save(); }),
+              SwitchListTile(title: Text(l10n.sound, style: GoogleFonts.amiri(color: Colors.white)), value: enableSound, activeColor: const Color(0xFFC19A6B), onChanged: (v) { setSheet(() => enableSound = v); setState(() => enableSound = v); _save(); }),
               const Divider(color: Colors.white10),
-              Text("تحديد الهدف", style: GoogleFonts.amiri(fontSize: 18, color: Colors.white70)),
+              Text(l10n.setTarget, style: GoogleFonts.amiri(fontSize: 18, color: Colors.white70)),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [33, 99, 1000].map((t) => ChoiceChip(

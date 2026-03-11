@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:projet_aaa/core/models/quran_data.dart';
+import 'package:projet_aaa_fixed/core/models/quran_data.dart';
 
 class QuranService {
   static final QuranService _instance = QuranService._internal();
@@ -11,7 +11,6 @@ class QuranService {
   List<Surah>? _quranData;
   List<Ayah>? _allVersesCache;
 
-  // دالة مساعدة للمعالجة في الخلفية
   static List<Surah> _parseQuran(String jsonString) {
     final dynamic decoded = json.decode(jsonString);
     if (decoded is Map<String, dynamic>) {
@@ -31,39 +30,21 @@ class QuranService {
 
   Future<List<Surah>> _loadQuranData() async {
     if (_quranData != null) return _quranData!;
-
     try {
-      debugPrint("[QuranService] Loading 'assets/quran/quran.json'...");
       final String jsonString = await rootBundle.loadString('assets/quran/quran.json');
-
-      // استخدام compute لتشغيل json.decode والتحويل في Isolate منفصل
       _quranData = await compute(_parseQuran, jsonString);
-
-      debugPrint("[QuranService] Loaded ${_quranData!.length} surahs.");
       return _quranData!;
     } catch (e) {
-      debugPrint("[QuranService] Error loading Quran data: $e");
       return [];
     }
   }
 
   Future<List<Ayah>> getAllVerses({bool excludeFatiha = true}) async {
     if (_allVersesCache != null && excludeFatiha) return _allVersesCache!;
-
     final quran = await _loadQuranData();
-    if (quran.isEmpty) {
-      debugPrint("[QuranService] Quran data is empty.");
-      return [];
-    }
-
-    // تشغيل عملية تسطيح (Flatten) القائمة أيضاً في الخلفية إذا كانت كبيرة
+    if (quran.isEmpty) return [];
     final allAyahs = await compute(_flattenAyahs, _FlattenParams(quran, excludeFatiha));
-
-    if (excludeFatiha) {
-      _allVersesCache = allAyahs;
-    }
-
-    debugPrint("[QuranService] TOTAL VERSES LOADED = ${allAyahs.length}");
+    if (excludeFatiha) _allVersesCache = allAyahs;
     return allAyahs;
   }
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:projet_aaa/core/providers/audio_provider.dart';
-import 'package:projet_aaa/core/providers/theme_provider.dart';
+import 'package:projet_aaa_fixed/core/providers/audio_provider.dart';
+import 'package:projet_aaa_fixed/core/providers/theme_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -131,8 +131,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     }
 
-    final tt = Theme.of(context).textTheme;
-
     return IslamicBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -150,13 +148,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Column(
             children: [
-              _buildCameraSection(tt),
+              _buildCameraSection(),
               const SizedBox(height: 20),
-              _buildLocationSection(tt),
+              _buildLocationSection(),
               const SizedBox(height: 20),
 
               _buildSettingsCard(
-                tt,
                 title: 'إعدادات الصلاة والتنبيهات',
                 children: [
                   _buildToggleSetting('تنبيهات الأذان', _settings.athanNotifications, 
@@ -169,7 +166,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildToggleSetting('تنبيه قبل الصلاة', _settings.prePrayerReminder, 
                     (v) => setState(() => _settings = _settings.copyWith(prePrayerReminder: v))),
                   if (_settings.prePrayerReminder)
-                    _buildReminderMinutesSlider(tt),
+                    _buildReminderMinutesSlider(),
                   const Divider(color: Colors.white10),
                   _buildDropdownSetting('طريقة حساب المواقيت', _settings.calculationMethod.toString(), 
                     {'5': 'الهيئة المصرية', '4': 'أم القرى', '3': 'رابطة العالم الإسلامي', '2': 'الجمعية الإسلامية لأمريكا'}, 
@@ -179,12 +176,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 20),
 
               _buildSettingsCard(
-                tt,
                 title: 'التخصيص والختمة',
                 children: [
-                  _buildThemeToggle(tt),
+                  _buildThemeToggle(),
                   const Divider(color: Colors.white10),
-                  _buildKhatmaDurationSlider(tt),
+                  _buildKhatmaDurationSlider(),
                   const Divider(color: Colors.white10),
                   _buildDropdownSetting('القارئ المفضل', _settings.qari, 
                     {
@@ -204,7 +200,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 20),
 
               _buildSettingsCard(
-                tt,
                 title: 'إدارة البيانات والتقدم',
                 children: [
                   _buildResetButton('تصفير تقدم الختمة', Icons.restart_alt, _resetKhatma),
@@ -237,7 +232,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildLocationSection(TextTheme tt) {
+  Widget _buildLocationSection() {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -270,7 +265,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildReminderMinutesSlider(TextTheme tt) {
+  Widget _buildReminderMinutesSlider() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -289,7 +284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSettingsCard(TextTheme tt, {required String title, required List<Widget> children}) {
+  Widget _buildSettingsCard({required String title, required List<Widget> children}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -344,12 +339,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildThemeToggle(TextTheme tt) {
+  Widget _buildThemeToggle() {
     return _buildToggleSetting('الوضع الليلي', _settings.isDarkMode, 
       (value) => setState(() => _settings = _settings.copyWith(isDarkMode: value)));
   }
 
-  Widget _buildKhatmaDurationSlider(TextTheme tt) {
+  Widget _buildKhatmaDurationSlider() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -386,7 +381,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildCameraSection(TextTheme tt) {
+  Widget _buildCameraSection() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),

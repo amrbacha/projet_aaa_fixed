@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:projet_aaa/core/providers/audio_provider.dart';
-import 'package:projet_aaa/core/providers/theme_provider.dart';
+import 'package:projet_aaa_fixed/core/providers/audio_provider.dart';
+import 'package:projet_aaa_fixed/core/providers/theme_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/settings_service.dart';
@@ -23,6 +23,19 @@ class _ReadingSettingsScreenState extends State<ReadingSettingsScreen> {
   static const double _containerOpacity = 0.12;
   static const double _containerBorderOpacity = 0.25;
 
+  // قائمة القراء المعتمدة لضمان عدم حدوث تعارض في الـ Dropdown
+  final Map<String, String> _qariMap = {
+    'mishary': 'مشاري العفاسي',
+    'sudais': 'عبد الرحمن السديس',
+    'ghamdi': 'سعد الغامدي',
+    'basit': 'عبد الباط عبد الصمد',
+    'husary': 'محمود خليل الحصري',
+    'minshawi': 'محمد صديق المنشاوي',
+    'muaiqly': 'ماهر المعيقلي',
+    'tablawi': 'محمد محمود الطبلاوي',
+    'shuraim': 'سعود الشريم',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -31,9 +44,16 @@ class _ReadingSettingsScreenState extends State<ReadingSettingsScreen> {
 
   Future<void> _loadSettings() async {
     final settings = await SettingsService.loadSettings();
+    
+    // تأمين القيمة: إذا كانت القيمة المخزنة غير موجودة في القائمة، نعود للوضع الافتراضي
+    String safeQari = settings.qari;
+    if (!_qariMap.containsKey(safeQari)) {
+      safeQari = 'mishary';
+    }
+
     if (mounted) {
       setState(() {
-        _settings = settings;
+        _settings = settings.copyWith(qari: safeQari);
         _isLoading = false;
       });
     }
@@ -89,8 +109,6 @@ class _ReadingSettingsScreenState extends State<ReadingSettingsScreen> {
       );
     }
 
-    final tt = Theme.of(context).textTheme;
-
     return IslamicBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -109,32 +127,19 @@ class _ReadingSettingsScreenState extends State<ReadingSettingsScreen> {
           child: Column(
             children: [
               _buildSettingsCard(
-                tt,
                 title: 'التخصيص والختمة',
                 children: [
-                  _buildThemeToggle(tt),
+                  _buildThemeToggle(),
                   const Divider(color: Colors.white10),
-                  _buildKhatmaDurationSlider(tt),
+                  _buildKhatmaDurationSlider(),
                   const Divider(color: Colors.white10),
-                  _buildDropdownSetting('القارئ المساعد', _settings.qari, 
-                    {
-                      'mishary': 'مشاري العفاسي',
-                      'sudais': 'عبد الرحمن السديس',
-                      'ghamdi': 'سعد الغامدي',
-                      'basit': 'عبد الباسط عبد الصمد',
-                      'husary': 'محمود خليل الحصري',
-                      'minshawi': 'محمد صديق المنشاوي',
-                      'muaiqly': 'ماهر المعيقلي',
-                      'tablawi': 'محمد محمود الطبلاوي',
-                      'shuraim': 'سعود الشريم',
-                    }, 
+                  _buildDropdownSetting('القارئ المساعد', _settings.qari, _qariMap,
                     (v) => setState(() => _settings = _settings.copyWith(qari: v!))),
                 ],
               ),
               const SizedBox(height: 20),
 
               _buildSettingsCard(
-                tt,
                 title: 'إدارة البيانات والتقدم',
                 children: [
                   _buildResetButton('تصفير تقدم الختمة والقراءة', Icons.restart_alt, _resetKhatma),
@@ -165,7 +170,7 @@ class _ReadingSettingsScreenState extends State<ReadingSettingsScreen> {
     );
   }
 
-  Widget _buildSettingsCard(TextTheme tt, {required String title, required List<Widget> children}) {
+  Widget _buildSettingsCard({required String title, required List<Widget> children}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -217,12 +222,12 @@ class _ReadingSettingsScreenState extends State<ReadingSettingsScreen> {
     );
   }
 
-  Widget _buildThemeToggle(TextTheme tt) {
+  Widget _buildThemeToggle() {
     return _buildToggleSetting('الوضع الليلي', _settings.isDarkMode, 
       (value) => setState(() => _settings = _settings.copyWith(isDarkMode: value)));
   }
 
-  Widget _buildKhatmaDurationSlider(TextTheme tt) {
+  Widget _buildKhatmaDurationSlider() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

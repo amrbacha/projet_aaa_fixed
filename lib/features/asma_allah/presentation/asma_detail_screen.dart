@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import 'package:projet_aaa/widgets/islamic_background.dart';
+import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
 import '../data/models/asma_model.dart';
 
 class AsmaDetailScreen extends StatelessWidget {

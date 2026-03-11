@@ -3,16 +3,17 @@ class AppSettings {
   final String qari;
   final String madhab;
   final bool athanNotifications;
-  final String adhanVoice; // مضاف: اختيار صوت الأذان
-  final bool prePrayerReminder; // مضاف: تنبيه قبل الصلاة
-  final int prePrayerReminderMinutes; // مضاف: عدد دقائق التنبيه المسبق
-  final int calculationMethod; // مضاف: طريقة حساب أوقات الصلاة (Aladhan API Method)
+  final String adhanVoice;
+  final bool prePrayerReminder;
+  final int prePrayerReminderMinutes;
+  final int calculationMethod;
   final bool isCameraOn;
   final bool isDarkMode;
   final int primaryColor;
   final int accentColor;
   final String backgroundImage;
   final bool isCustomBackground;
+  final String anisVoiceProfile; // مضاف: شخصية صوت أنيس (sage, companion, etc.)
 
   AppSettings({
     required this.khatmaDuration,
@@ -29,6 +30,7 @@ class AppSettings {
     required this.accentColor,
     required this.backgroundImage,
     this.isCustomBackground = false,
+    this.anisVoiceProfile = 'companion',
   });
 
   factory AppSettings.defaultSettings() {
@@ -40,13 +42,14 @@ class AppSettings {
       adhanVoice: 'makkah',
       prePrayerReminder: false,
       prePrayerReminderMinutes: 10,
-      calculationMethod: 5, // Default: Egyptian General Authority
+      calculationMethod: 5,
       isCameraOn: true,
       isDarkMode: false,
       primaryColor: 0xff1E8449,
       accentColor: 0xfff5a623,
       backgroundImage: 'assets/images/backgrounds/bg1.png',
       isCustomBackground: false,
+      anisVoiceProfile: 'companion',
     );
   }
 
@@ -65,6 +68,7 @@ class AppSettings {
     int? accentColor,
     String? backgroundImage,
     bool? isCustomBackground,
+    String? anisVoiceProfile,
   }) {
     return AppSettings(
       khatmaDuration: khatmaDuration ?? this.khatmaDuration,
@@ -81,6 +85,7 @@ class AppSettings {
       accentColor: accentColor ?? this.accentColor,
       backgroundImage: backgroundImage ?? this.backgroundImage,
       isCustomBackground: isCustomBackground ?? this.isCustomBackground,
+      anisVoiceProfile: anisVoiceProfile ?? this.anisVoiceProfile,
     );
   }
 
@@ -99,6 +104,7 @@ class AppSettings {
     'accentColor': accentColor,
     'backgroundImage': backgroundImage,
     'isCustomBackground': isCustomBackground,
+    'anisVoiceProfile': anisVoiceProfile,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -117,6 +123,7 @@ class AppSettings {
       accentColor: json['accentColor'] as int? ?? 0xfff5a623,
       backgroundImage: json['backgroundImage'] as String? ?? 'assets/images/backgrounds/bg1.png',
       isCustomBackground: json['isCustomBackground'] as bool? ?? false,
+      anisVoiceProfile: json['anisVoiceProfile'] as String? ?? 'companion',
     );
   }
 }

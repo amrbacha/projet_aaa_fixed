@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-
+import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../../models/settings_model.dart';
 import '../../../widgets/islamic_background.dart';
 import '../../../core/theme.dart';
+import '../../../core/services/assistant_service.dart';
 
 class ThemeCustomizationScreen extends StatefulWidget {
   const ThemeCustomizationScreen({super.key});
@@ -18,6 +18,7 @@ class ThemeCustomizationScreen extends StatefulWidget {
 
 class _ThemeCustomizationScreenState extends State<ThemeCustomizationScreen> {
   final ImagePicker _picker = ImagePicker();
+  final AssistantService _anis = AssistantService();
 
   Future<void> _pickImage(ThemeProvider themeProvider, AppSettings settings) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
@@ -26,11 +27,29 @@ class _ThemeCustomizationScreenState extends State<ThemeCustomizationScreen> {
     }
   }
 
+  void _previewAnisVoice(String profileName, AppLocalizations l10n) async {
+    AnisVoiceProfile profile;
+    String sampleText = "";
+    
+    switch (profileName) {
+      case 'sage': profile = AnisVoiceProfile.sage; sampleText = l10n.sage; break;
+      case 'motivator': profile = AnisVoiceProfile.motivator; sampleText = l10n.motivator; break;
+      case 'peaceful': profile = AnisVoiceProfile.peaceful; sampleText = l10n.peaceful; break;
+      case 'orator': profile = AnisVoiceProfile.orator; sampleText = l10n.orator; break;
+      case 'mentor': profile = AnisVoiceProfile.mentor; sampleText = l10n.mentor; break;
+      default: profile = AnisVoiceProfile.companion; sampleText = l10n.companion;
+    }
+    
+    await _anis.applyVoiceProfile(profile);
+    await _anis.speak(sampleText);
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final settings = themeProvider.settings;
     final tt = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context)!;
 
     return IslamicBackground(
       child: Scaffold(
@@ -40,8 +59,8 @@ class _ThemeCustomizationScreenState extends State<ThemeCustomizationScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           foregroundColor: Colors.white,
-          toolbarHeight: 45, // تقليل ارتفاع الـ AppBar
-          title: Text('خصص واجهتك النورانية', style: tt.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+          toolbarHeight: 45,
+          title: Text(l10n.customizeInterface, style: tt.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
           centerTitle: true,
         ),
         body: SingleChildScrollView(
@@ -49,47 +68,63 @@ class _ThemeCustomizationScreenState extends State<ThemeCustomizationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildSection(context, 'نمط العرض', 
-                _ThemeModeSelector(isDarkMode: settings.isDarkMode, onSelect: (isDark) {
-                  themeProvider.updateSettings(settings.copyWith(isDarkMode: isDark));
-                })
+              _buildSection(context, l10n.displayMode, 
+                _ThemeModeSelector(
+                  isDarkMode: settings.isDarkMode, 
+                  onSelect: (isDark) {
+                    themeProvider.updateSettings(settings.copyWith(isDarkMode: isDark));
+                  },
+                  l10n: l10n,
+                )
               ),
-              const SizedBox(height: 12), // تقليل المسافة
-              _buildSection(context, 'اختر الخلفية', 
+              const SizedBox(height: 12),
+              _buildSection(context, l10n.chooseBackground, 
                 _BackgroundSelector(
                   settings: settings,
+                  l10n: l10n,
                   onSelectDefault: (path) {
                     themeProvider.updateSettings(settings.copyWith(backgroundImage: path, isCustomBackground: false));
                   },
                   onPickImage: () => _pickImage(themeProvider, settings),
                 )
               ),
-              const SizedBox(height: 12), // تقليل المسافة
-              _buildSection(context, 'اللون الأساسي للأزرار', 
+              const SizedBox(height: 12),
+              _buildSection(context, l10n.anisPersonality, 
+                _AnisVoiceSelector(
+                  selectedProfile: settings.anisVoiceProfile,
+                  l10n: l10n,
+                  onSelect: (p) {
+                    themeProvider.updateSettings(settings.copyWith(anisVoiceProfile: p));
+                    _previewAnisVoice(p, l10n);
+                  },
+                )
+              ),
+              const SizedBox(height: 12),
+              _buildSection(context, l10n.primaryColor, 
                 _ColorSelector(colors: const [
                   Color(0xFF0B6B3A), Color(0xFF154360), Color(0xFF6D214F), Color(0xFF4A235A),
                 ], 
                 selectedColor: Color(settings.primaryColor), 
                 onSelect: (c) => themeProvider.updateSettings(settings.copyWith(primaryColor: c.value)))
               ),
-              const SizedBox(height: 12), // تقليل المسافة
-              _buildSection(context, 'لون التفاصيل والكتابة',
+              const SizedBox(height: 12),
+              _buildSection(context, l10n.accentColor,
                  _ColorSelector(colors: const [
                   Color(0xFFF5A623), Color(0xFF1ABC9C), Color(0xFF3498DB), Color(0xFFE74C3C), Color(0xFFF1C40F), Color(0xFF9B59B6),
                 ], 
                 selectedColor: Color(settings.accentColor), 
                 onSelect: (c) => themeProvider.updateSettings(settings.copyWith(accentColor: c.value)))
               ),
-              const SizedBox(height: 16), // تقليل المسافة
-              _buildPreviewCard(context, settings),
-              const SizedBox(height: 20), // تقليل المسافة
+              const SizedBox(height: 16),
+              _buildPreviewCard(context, settings, l10n),
+              const SizedBox(height: 20),
               SizedBox(
-                height: 52, // تقليل ارتفاع الزر قليلاً
+                height: 52,
                 child: FilledButton(
                   style: FilledButton.styleFrom(backgroundColor: Color(settings.accentColor), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                   onPressed: () => context.go('/main-menu'),
                   child: Text(
-                    'ابدأ رحلتي الآن',
+                    l10n.startMyJourney,
                     style: tt.titleMedium?.copyWith(
                       color: ThemeData.estimateBrightnessForColor(Color(settings.accentColor)) == Brightness.dark ? Colors.white : Colors.black,
                       fontWeight: FontWeight.bold
@@ -107,7 +142,7 @@ class _ThemeCustomizationScreenState extends State<ThemeCustomizationScreen> {
 
   Widget _buildSection(BuildContext context, String title, Widget child) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0), // تقليل الـ padding الداخلي
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.35),
         borderRadius: BorderRadius.circular(16),
@@ -123,7 +158,7 @@ class _ThemeCustomizationScreenState extends State<ThemeCustomizationScreen> {
     );
   }
 
-  Widget _buildPreviewCard(BuildContext context, AppSettings settings) {
+  Widget _buildPreviewCard(BuildContext context, AppSettings settings, AppLocalizations l10n) {
     final previewTheme = settings.isDarkMode 
       ? AppTheme.dark(primaryColor: Color(settings.primaryColor), accentColor: Color(settings.accentColor))
       : AppTheme.light(primaryColor: Color(settings.primaryColor), accentColor: Color(settings.accentColor));
@@ -135,10 +170,10 @@ class _ThemeCustomizationScreenState extends State<ThemeCustomizationScreen> {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // تقليل الـ padding
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Column(
             children: [
-              Text("معاينة حية", style: previewTheme.textTheme.titleMedium?.copyWith(color: previewTheme.colorScheme.onSurface)),
+              Text(l10n.livePreview, style: previewTheme.textTheme.titleMedium?.copyWith(color: previewTheme.colorScheme.onSurface)),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -146,13 +181,13 @@ class _ThemeCustomizationScreenState extends State<ThemeCustomizationScreen> {
                   Column(
                     children: [
                       Icon(Icons.mosque, size: 28, color: previewTheme.colorScheme.primary),
-                      Text("نص أساسي", style: previewTheme.textTheme.bodySmall?.copyWith(color: previewTheme.colorScheme.primary)),
+                      Text(l10n.primaryText, style: previewTheme.textTheme.bodySmall?.copyWith(color: previewTheme.colorScheme.primary)),
                     ],
                   ),
                   Column(
                     children: [
                       Icon(Icons.star, size: 28, color: previewTheme.colorScheme.secondary),
-                      Text("نص ثانوي", style: previewTheme.textTheme.bodySmall?.copyWith(color: previewTheme.colorScheme.secondary)),
+                      Text(l10n.secondaryText, style: previewTheme.textTheme.bodySmall?.copyWith(color: previewTheme.colorScheme.secondary)),
                     ],
                   ),
                 ],
@@ -160,7 +195,7 @@ class _ThemeCustomizationScreenState extends State<ThemeCustomizationScreen> {
                const SizedBox(height: 12),
               SizedBox(
                 height: 36,
-                child: FilledButton(onPressed: (){}, style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16)), child: const Text("زر مثال", style: TextStyle(fontSize: 12)))
+                child: FilledButton(onPressed: (){}, style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16)), child: Text(l10n.exampleButton, style: const TextStyle(fontSize: 12)))
               )
             ],
           ),
@@ -170,12 +205,66 @@ class _ThemeCustomizationScreenState extends State<ThemeCustomizationScreen> {
   }
 }
 
+class _AnisVoiceSelector extends StatelessWidget {
+  final String selectedProfile;
+  final AppLocalizations l10n;
+  final Function(String) onSelect;
+
+  const _AnisVoiceSelector({required this.selectedProfile, required this.l10n, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final profiles = [
+      {'id': 'companion', 'name': l10n.companion, 'icon': Icons.person},
+      {'id': 'sage', 'name': l10n.sage, 'icon': Icons.auto_awesome},
+      {'id': 'motivator', 'name': l10n.motivator, 'icon': Icons.bolt},
+      {'id': 'peaceful', 'name': l10n.peaceful, 'icon': Icons.spa},
+      {'id': 'orator', 'name': l10n.orator, 'icon': Icons.record_voice_over},
+      {'id': 'mentor', 'name': l10n.mentor, 'icon': Icons.school},
+    ];
+
+    return SizedBox(
+      height: 85,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: profiles.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final p = profiles[index];
+          final isSelected = p['id'] == selectedProfile;
+          return GestureDetector(
+            onTap: () => onSelect(p['id'] as String),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 80,
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xfff5a623) : Colors.black26,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isSelected ? Colors.white : Colors.white24),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(p['icon'] as IconData, color: isSelected ? const Color(0xFF0D3B2E) : Colors.white70, size: 24),
+                  const SizedBox(height: 4),
+                  Text(p['name'] as String, style: TextStyle(color: isSelected ? const Color(0xFF0D3B2E) : Colors.white70, fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _BackgroundSelector extends StatelessWidget {
   final AppSettings settings;
+  final AppLocalizations l10n;
   final Function(String) onSelectDefault;
   final VoidCallback onPickImage;
 
-  const _BackgroundSelector({required this.settings, required this.onSelectDefault, required this.onPickImage});
+  const _BackgroundSelector({required this.settings, required this.l10n, required this.onSelectDefault, required this.onPickImage});
 
   void _showDefaultBackgroundsDialog(BuildContext context) {
     final List<String> defaultImages = [
@@ -192,7 +281,7 @@ class _BackgroundSelector extends StatelessWidget {
         return AlertDialog(
           backgroundColor: const Color(0xFF2c3e50),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('اختر خلفية مقترحة', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          title: Text(l10n.chooseSuggestedBackground, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           content: SizedBox(
             width: double.maxFinite,
             child: GridView.builder(
@@ -221,7 +310,7 @@ class _BackgroundSelector extends StatelessWidget {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('إغلاق', style: TextStyle(color: Colors.white)))
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.close, style: const TextStyle(color: Colors.white)))
           ],
         );
       },
@@ -231,14 +320,14 @@ class _BackgroundSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 90, // تقليل الارتفاع من 120 إلى 90
+      height: 90,
       child: Row(
         children: [
           Expanded(
             child: _buildChoiceChip(
               context,
               icon: Icons.photo_library_outlined,
-              label: 'خلفيات مقترحة',
+              label: l10n.suggestedBackgrounds,
               onTap: () => _showDefaultBackgroundsDialog(context),
             ),
           ),
@@ -247,7 +336,7 @@ class _BackgroundSelector extends StatelessWidget {
             child: _buildChoiceChip(
               context,
               icon: Icons.add_photo_alternate_outlined,
-              label: 'من جهازك',
+              label: l10n.fromDevice,
               onTap: onPickImage,
             ),
           ),
@@ -268,7 +357,7 @@ class _BackgroundSelector extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 28), // تقليل حجم الأيقونة
+            Icon(icon, color: Colors.white, size: 28),
             const SizedBox(height: 4),
             Text(label, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
           ],
@@ -288,7 +377,7 @@ class _ColorSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 40, // تقليل الارتفاع من 48 إلى 40
+      height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: colors.length,
@@ -318,13 +407,14 @@ class _ColorSelector extends StatelessWidget {
 
 class _ThemeModeSelector extends StatelessWidget {
   final bool isDarkMode;
+  final AppLocalizations l10n;
   final Function(bool) onSelect;
-  const _ThemeModeSelector({required this.isDarkMode, required this.onSelect});
+  const _ThemeModeSelector({required this.isDarkMode, required this.l10n, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
      return Container(
-      height: 44, // تقليل الارتفاع من 52 إلى 44
+      height: 44,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: Colors.white.withOpacity(0.1),
@@ -332,8 +422,8 @@ class _ThemeModeSelector extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _themeChip('ليلي', true, isDarkMode, () => onSelect(true)),
-          _themeChip('نهاري', false, !isDarkMode, () => onSelect(false)),
+          _themeChip(l10n.night, true, isDarkMode, () => onSelect(true)),
+          _themeChip(l10n.day, false, !isDarkMode, () => onSelect(false)),
         ],
       ),
     );

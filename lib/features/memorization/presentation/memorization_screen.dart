@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:projet_aaa/core/data/surah_names.dart';
-import 'package:projet_aaa/widgets/islamic_background.dart';
+import 'package:projet_aaa_fixed/core/data/surah_names.dart';
+import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
 
 class MemorizationScreen extends StatelessWidget {
   const MemorizationScreen({super.key});

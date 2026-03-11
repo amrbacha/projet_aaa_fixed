@@ -1,7 +1,7 @@
-import 'package:projet_aaa/core/models/quran_data.dart';
-import 'package:projet_aaa/core/services/quran_service.dart';
-import 'package:projet_aaa/features/adhkar/data/adhkar_data.dart';
-import 'package:projet_aaa/features/adhkar/data/models/adhkar_model.dart';
+import 'package:projet_aaa_fixed/core/models/quran_data.dart';
+import 'package:projet_aaa_fixed/core/services/quran_service.dart';
+import 'package:projet_aaa_fixed/features/adhkar/data/adhkar_data.dart';
+import 'package:projet_aaa_fixed/features/adhkar/data/models/adhkar_model.dart';
 
 class SearchResult {
   final String title;

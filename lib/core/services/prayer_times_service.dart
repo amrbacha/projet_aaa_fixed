@@ -2,16 +2,14 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
-import 'package:projet_aaa/core/services/notification_service.dart';
+import 'package:projet_aaa_fixed/core/services/notification_service.dart';
 
 class PrayerTimesService {
   static const String baseUrl = 'http://api.aladhan.com/v1/timings';
 
-  // Kaaba location
   static const double _kaabaLatitude = 21.4225;
   static const double _kaabaLongitude = 39.8262;
 
-  /// جلب أوقات الصلاة بناءً على تاريخ وخط عرض/طول
   static Future<Map<String, String>?> fetchPrayerTimes({
     required double latitude,
     required double longitude,
@@ -40,7 +38,6 @@ class PrayerTimesService {
     return null;
   }
 
-  /// الحصول على موقع المستخدم الحالي
   static Future<Position?> getCurrentLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return null;
@@ -55,7 +52,6 @@ class PrayerTimesService {
     return await Geolocator.getCurrentPosition();
   }
 
-  /// المهمة الاحترافية: تحديث وجدولة جميع الصلوات بناءً على الموقع الحالي
   static Future<void> refreshAndScheduleAllPrayers() async {
     final position = await getCurrentLocation();
     if (position == null) return;
@@ -68,7 +64,6 @@ class PrayerTimesService {
     if (timings == null) return;
 
     final notificationService = NotificationService();
-    // إلغاء التنبيهات القديمة لتجنب التكرار
     await notificationService.cancelAllNotifications();
 
     final now = DateTime.now();
@@ -90,7 +85,6 @@ class PrayerTimesService {
         int.parse(parts[1]),
       );
 
-      // جدولة الصلاة فقط إذا لم يحن وقتها بعد لهذا اليوم
       if (scheduledTime.isAfter(now)) {
         await notificationService.schedulePrayerNotification(
           id: key.hashCode,
