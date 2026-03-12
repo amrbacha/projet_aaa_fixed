@@ -1,39 +1,41 @@
 import 'package:go_router/go_router.dart';
-import 'package:projet_aaa_fixed/certificate/certificate_selector_screen.dart';
-import 'package:projet_aaa_fixed/certificate/certificate_viewer_screen.dart';
-import 'package:projet_aaa_fixed/core/models/quran_data.dart';
-import 'package:projet_aaa_fixed/features/adhkar/data/models/adhkar_model.dart';
-import 'package:projet_aaa_fixed/features/adhkar/presentation/adhkar_screen.dart';
-import 'package:projet_aaa_fixed/features/adhkar/presentation/adhkar_session_screen.dart';
-import 'package:projet_aaa_fixed/features/main_menu/presentation/main_menu_screen.dart';
-import 'package:projet_aaa_fixed/features/memorization/presentation/memorization_dashboard_screen.dart';
-import 'package:projet_aaa_fixed/features/memorization/presentation/memorization_session_screen.dart';
-import 'package:projet_aaa_fixed/features/memorization/presentation/memorization_settings_screen.dart';
-import 'package:projet_aaa_fixed/features/qibla/presentation/qibla_screen.dart';
-import 'package:projet_aaa_fixed/features/reading/presentation/reading_dashboard_screen.dart';
-import 'package:projet_aaa_fixed/features/reading/presentation/reading_screen.dart';
-import 'package:projet_aaa_fixed/features/reading/presentation/reading_settings_screen.dart';
-import 'package:projet_aaa_fixed/features/tafseer/presentation/tafseer_screen.dart';
-import 'package:projet_aaa_fixed/features/tafseer/presentation/surah_tafseer_screen.dart';
-import 'package:projet_aaa_fixed/features/tafseer/presentation/ayah_tadabbur_screen.dart';
-import 'package:projet_aaa_fixed/features/tasbeeh/presentation/tasbeeh_screen.dart';
-import 'package:projet_aaa_fixed/features/asma_allah/presentation/asma_allah_screen.dart';
-import 'package:projet_aaa_fixed/features/asma_allah/presentation/asma_detail_screen.dart';
-import 'package:projet_aaa_fixed/features/asma_allah/presentation/asma_quiz_screen.dart';
-import 'package:projet_aaa_fixed/features/asma_allah/data/models/asma_model.dart';
-import 'package:projet_aaa_fixed/features/search/presentation/global_search_screen.dart';
-import 'package:projet_aaa_fixed/features/onboarding/presentation/splash_screen.dart';
-import 'package:projet_aaa_fixed/features/onboarding/presentation/voice_calibration_screen.dart';
+
+import '../certificate/certificate_selector_screen.dart';
+import '../certificate/certificate_viewer_screen.dart';
+import 'models/quran_data.dart';
+import '../features/adhkar/data/models/adhkar_model.dart';
+import '../features/adhkar/presentation/adhkar_screen.dart';
+import '../features/adhkar/presentation/adhkar_session_screen.dart';
+import '../features/asma_allah/data/models/asma_model.dart';
+import '../features/asma_allah/presentation/asma_allah_screen.dart';
+import '../features/asma_allah/presentation/asma_detail_screen.dart';
+import '../features/asma_allah/presentation/asma_quiz_screen.dart';
+import '../features/main_menu/presentation/main_menu_screen.dart';
+import '../features/memorization/presentation/memorization_dashboard_screen.dart';
+import '../features/memorization/presentation/memorization_session_screen.dart';
+import '../features/memorization/presentation/memorization_settings_screen.dart';
+import '../features/onboarding/presentation/splash_screen.dart';
+import '../features/onboarding/presentation/theme_customization_screen.dart';
+import '../features/onboarding/presentation/voice_calibration_screen.dart';
+import '../features/prayer/presentation/prayer_screen.dart';
+import '../features/prayer_coach/presentation/prayer_coach_debug_screen.dart';
+import '../features/qibla/presentation/qibla_screen.dart';
+import '../features/reading/presentation/reading_dashboard_screen.dart';
+import '../features/reading/presentation/reading_screen.dart';
+import '../features/reading/presentation/reading_settings_screen.dart';
+import '../features/search/presentation/global_search_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
+import '../features/tafseer/presentation/ayah_tadabbur_screen.dart';
+import '../features/tafseer/presentation/surah_tafseer_screen.dart';
+import '../features/tafseer/presentation/tafseer_screen.dart';
+import '../features/tasbeeh/presentation/tasbeeh_screen.dart';
+import '../features/tracking/presentation/tracking_screen.dart';
 import '../features/onboarding/presentation/language_screen.dart';
 import '../features/onboarding/presentation/personal_info_screen.dart';
-import '../features/onboarding/presentation/theme_customization_screen.dart';
-import '../features/tracking/presentation/tracking_screen.dart';
-import '../features/settings/presentation/settings_screen.dart';
-import '../features/prayer/presentation/prayer_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
-    initialLocation: '/language',
+    initialLocation: '/splash',
     routes: [
       GoRoute(
         path: '/splash',
@@ -130,7 +132,7 @@ class AppRouter {
         path: '/surah-tafseer',
         name: 'surah-tafseer',
         builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>;
+          final extra = state.extra as Map;
           return SurahTafseerScreen(
             surahNumber: extra['surahNumber'],
             surahName: extra['surahName'],
@@ -185,8 +187,8 @@ class AppRouter {
         path: '/certificate-viewer',
         name: 'certificate-viewer',
         builder: (context, state) {
-          if (state.extra is Map<String, dynamic>) {
-            final data = state.extra as Map<String, dynamic>;
+          if (state.extra is Map) {
+            final data = state.extra as Map;
             return CertificateViewerScreen(
               certificateId: data['certificateId'] ?? 'general',
               surahName: data['surahName'],
@@ -197,18 +199,24 @@ class AppRouter {
           );
         },
       ),
-       GoRoute(
+      GoRoute(
         path: '/prayer',
         name: 'prayer',
         builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>;
+          final extra = state.extra as Map;
           final prayerName = extra['prayerName'] as String;
-          final wird = extra['wird'] as List<Ayah>;
+          final wird = (extra['wird'] as List).cast<Ayah>();
+
           return PrayerScreen(
             prayerName: prayerName,
             wird: wird,
           );
         },
+      ),
+      GoRoute(
+        path: '/prayer-coach-debug',
+        name: 'prayer-coach-debug',
+        builder: (context, state) => const PrayerCoachDebugScreen(),
       ),
     ],
   );
