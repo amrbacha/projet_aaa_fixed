@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../../core/services/local_storage_service.dart';
-import '../../onboarding/presentation/language_screen.dart';
-import '../../../models/service_model.dart'; // تأكد من المسار الصحيح
+import '../../../models/service_model.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadUserData() async {
     final u = await LocalStorageService.getUserData();
     final l = await LocalStorageService.getLanguage();
+    if (!mounted) return;
     setState(() {
       user = u;
       lang = l;
@@ -33,7 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _updateTime() {
-    // تحديث الوقت كل ثانية
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
         final now = DateTime.now();
@@ -47,7 +48,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _formatDate(DateTime date) {
-    // يمكن تخصيص الصيغة حسب اللغة
     return "${date.year}/${date.month}/${date.day}";
   }
 
@@ -55,37 +55,48 @@ class _HomeScreenState extends State<HomeScreen> {
     return "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')}";
   }
 
-  // قائمة الخدمات
-  List<ServiceModel> get services => [
+  List<ServiceModel> services(BuildContext context) => [
         ServiceModel(
           title: 'ختم القرآن في الصلاة',
           description: 'برنامج مخصص لختم القرآن الكريم كاملاً خلال صلواتك المفروضة في شهر واحد.',
           icon: Icons.menu_book,
           color: Colors.green.shade100,
+          onTap: () => context.push('/home'),
         ),
         ServiceModel(
           title: 'ختم القرآن بالقراءة',
           description: 'حدد وردك اليومي واقرأ المصحف الشريف مباشرة.',
           icon: Icons.auto_stories,
           color: Colors.blue.shade100,
+          onTap: () => context.push('/reading'),
         ),
         ServiceModel(
           title: 'حفظ القرآن الكريم',
           description: 'خطة منهجية لحفظ السور والآيات مع مراجعة دورية.',
           icon: Icons.school,
           color: Colors.orange.shade100,
+          onTap: () => context.push('/memorization'),
         ),
         ServiceModel(
           title: 'التفسير والتدبر',
           description: 'تعلم معاني الآيات وتدبر كلام الله مع نخبة من المفسرين.',
           icon: Icons.lightbulb,
           color: Colors.purple.shade100,
+          onTap: () => context.push('/tafseer'),
         ),
         ServiceModel(
           title: 'الأذكار والأدعية',
           description: 'أذكار الصباح والمساء، وأدعية من الكتاب والسنة لكل حال.',
           icon: Icons.spa,
           color: Colors.teal.shade100,
+          onTap: () => context.push('/adhkar'),
+        ),
+        ServiceModel(
+          title: 'أتعلم صلاتي',
+          description: 'تعليم شامل للوضوء ومبادئ الصلاة وخطواتها، مناسب للمبتدئ والطفل.',
+          icon: Icons.self_improvement_rounded,
+          color: const Color(0xFFFFE4B8),
+          onTap: () => context.push('/prayer-learning'),
         ),
       ];
 
@@ -94,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final cs = Theme.of(context).colorScheme;
     final name = user['fullName']?.isNotEmpty == true ? user['fullName'] : 'أحمد بن محمد';
     final greeting = _getGreeting();
+    final serviceItems = services(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5FBF7),
@@ -112,9 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {
-              // TODO: انتقل إلى شاشة الإعدادات
-            },
+            onPressed: () => context.push('/settings'),
           ),
         ],
       ),
@@ -124,7 +134,6 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // بطاقة الترحيب
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -148,56 +157,60 @@ class _HomeScreenState extends State<HomeScreen> {
                       greeting,
                       style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$currentDate  •  $currentTime',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-
-              // قسم "موصى به"
               const Text(
                 'موصى به',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cs.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'رحلة الختمة المباركة',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'رحلة 30 يوماً لختم القرآن في صلواتك، تقدمك محفوظ ومقسم بذكاء.',
-                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-                          ),
-                        ],
+              InkWell(
+                onTap: () => context.push('/prayer-learning'),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cs.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFF5A623).withOpacity(0.35)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'أتعلم صلاتي',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'صفحة تعليمية جديدة تضم الوضوء ومبادئ الصلاة وتعليمها خطوة بخطوة للكبار والأطفال.',
+                              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Icon(Icons.arrow_forward, color: cs.primary),
-                  ],
+                      const SizedBox(width: 10),
+                      Icon(Icons.arrow_forward, color: cs.primary),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
-
-              // عنوان الخدمات
               const Text(
                 'الخدمات والبرامج',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-
-              // قائمة الخدمات (Grid)
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -207,9 +220,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSpacing: 12,
                   childAspectRatio: 0.9,
                 ),
-                itemCount: services.length,
+                itemCount: serviceItems.length,
                 itemBuilder: (context, index) {
-                  final service = services[index];
+                  final service = serviceItems[index];
                   return GestureDetector(
                     onTap: service.onTap,
                     child: Container(
@@ -236,7 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 service.description,
                                 style: const TextStyle(fontSize: 11),
-                                maxLines: 2,
+                                maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
@@ -244,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Align(
                             alignment: Alignment.bottomLeft,
                             child: TextButton(
-                              onPressed: () {},
+                              onPressed: service.onTap,
                               style: TextButton.styleFrom(
                                 padding: EdgeInsets.zero,
                                 minimumSize: Size.zero,
@@ -263,11 +276,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               const SizedBox(height: 20),
-
-              // اقتباس سفلي
               Center(
                 child: Text(
-                  'اجعل صلاتك خاشعة متصلة بكلام الله، كل سجدة خطوة نحو الجنة.',
+                  'اجعل صلاتك خاشعة متصلة بكلام الله، وكل خطوة في التعلم تقربك أكثر من الإتقان.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),

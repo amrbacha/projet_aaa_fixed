@@ -19,6 +19,7 @@ import '../features/onboarding/presentation/theme_customization_screen.dart';
 import '../features/onboarding/presentation/voice_calibration_screen.dart';
 import '../features/prayer/presentation/prayer_screen.dart';
 import '../features/prayer_coach/presentation/prayer_coach_debug_screen.dart';
+import '../features/prayer_learning/presentation/prayer_learning_screen.dart';
 import '../features/qibla/presentation/qibla_screen.dart';
 import '../features/reading/presentation/reading_dashboard_screen.dart';
 import '../features/reading/presentation/reading_screen.dart';
@@ -35,7 +36,7 @@ import '../features/onboarding/presentation/personal_info_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
-    initialLocation: '/splash',
+    initialLocation: '/language',
     routes: [
       GoRoute(
         path: '/splash',
@@ -217,6 +218,11 @@ class AppRouter {
         path: '/prayer-coach-debug',
         name: 'prayer-coach-debug',
         builder: (context, state) => const PrayerCoachDebugScreen(),
+      ),
+      GoRoute(
+        path: '/prayer-learning',
+        name: 'prayer-learning',
+        builder: (context, state) => const PrayerLearningScreen(),
       ),
     ],
   );

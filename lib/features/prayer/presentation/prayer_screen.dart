@@ -1,20 +1,33 @@
+
 import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui';
+
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:provider/provider.dart';
 import 'package:projet_aaa_fixed/core/models/quran_data.dart';
-import 'package:projet_aaa_fixed/core/services/smart_quran_service.dart';
 import 'package:projet_aaa_fixed/core/providers/audio_provider.dart';
-import 'package:projet_aaa_fixed/core/services/pose_detection_service.dart';
-import 'package:projet_aaa_fixed/core/services/camera_utils.dart';
 import 'package:projet_aaa_fixed/core/providers/theme_provider.dart';
 import 'package:projet_aaa_fixed/core/services/assistant_service.dart';
-import 'package:projet_aaa_fixed/core/services/quran_service.dart';
 import 'package:projet_aaa_fixed/core/services/local_storage_service.dart';
+import 'package:projet_aaa_fixed/core/services/quran_service.dart';
+import 'package:projet_aaa_fixed/core/services/smart_quran_service.dart';
+import 'package:projet_aaa_fixed/core/services/windowed_wird_recitation_engine.dart' as wird_matcher;
+import 'package:projet_aaa_fixed/features/prayer_coach/application/controllers/prayer_coach_controller.dart';
+import 'package:projet_aaa_fixed/features/prayer_coach/application/state/prayer_coach_debug_state.dart';
+import 'package:projet_aaa_fixed/features/prayer_coach/domain/enums/prayer_posture.dart';
+import 'package:projet_aaa_fixed/features/prayer_coach/presentation/widgets/camera_pose_preview.dart';
+import 'package:projet_aaa_fixed/features/prayer_session/controllers/prayer_session_controller.dart';
+import 'package:projet_aaa_fixed/features/prayer_session/services/smart_prayer_engine.dart';
 import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
 import '../../../l10n/app_localizations.dart';
+
+enum PrayerPosition { standing, ruku, sujud, sitting, takbir, unknown }
 
 class PrayerFlowStep {
   final String title;
@@ -28,26 +41,24 @@ class PrayerFlowStep {
   final PrayerPosition expectedPosition;
   final int repetitionCount;
   final Duration pauseAfter;
-
-  PrayerFlowStep(this.title, this.rakahNumber, {
-    this.content, 
-    this.surahName,
-    this.ayahNumber,
-    this.isRecitation = false,
-    this.surahNumber, 
-    this.isAction = false,
-    this.expectedPosition = PrayerPosition.standing,
-    this.repetitionCount = 1,
-    this.pauseAfter = const Duration(milliseconds: 1000),
-  });
+  final int? wirdIndex;
+  PrayerFlowStep(this.title, this.rakahNumber,
+      {this.content,
+      this.surahName,
+      this.ayahNumber,
+      this.isRecitation = false,
+      this.surahNumber,
+      this.isAction = false,
+      this.expectedPosition = PrayerPosition.standing,
+      this.repetitionCount = 1,
+      this.pauseAfter = const Duration(milliseconds: 1000),
+      this.wirdIndex});
 }
 
 class PrayerScreen extends StatefulWidget {
   final String prayerName;
   final List<Ayah> wird;
-
   const PrayerScreen({super.key, required this.prayerName, required this.wird});
-
   @override
   State<PrayerScreen> createState() => _PrayerScreenState();
 }
@@ -55,29 +66,30 @@ class PrayerScreen extends StatefulWidget {
 class _PrayerScreenState extends State<PrayerScreen> {
   int _currentStepIndex = 0;
   List<PrayerFlowStep> _fullPrayerFlow = [];
-  bool _isLoading = true;
-  bool _isCalibrating = true;
-  bool _prayerStarted = false;
-  
+  bool _isLoading = true, _isCalibrating = true, _prayerStarted = false, _isExecutingStep = false;
   late bool _isCameraEnabled;
-  bool _isAnisListening = true;
-  bool _isQariAudioEnabled = true;
-  
-  double _qariSpeed = 1.0; 
-  double _transitionSpeedFactor = 1.0; 
+  bool _isAnisListening = true, _isQariAudioEnabled = true;
+  double _qariSpeed = 1.0, _transitionSpeedFactor = 1.0, _quranFontSize = 44;
+  int _fontMode = 1;
 
   CameraController? _cameraController;
-  final PoseDetectionService _poseService = PoseDetectionService();
-  final SmartQuranService _smartQuran = SmartQuranService();
   final AssistantService _anis = AssistantService();
   final QuranService _quranService = QuranService();
+  final SmartQuranService _smartQuran = SmartQuranService();
+  final PoseDetector _poseDetector = PoseDetector(
+    options: PoseDetectorOptions(model: PoseDetectionModel.accurate, mode: PoseDetectionMode.stream),
+  );
+  final PrayerCoachController _coachController = PrayerCoachController();
 
-  bool _isCameraReady = false;
-  PoseVisibility? _lastVisibility;
-  
-  // متغيرات المصحح الذكي
+  bool _isCameraReady = false, _isFrontCamera = true, _isProcessingFrame = false;
+  int _frameCounter = 0;
+  PrayerCoachDebugState _coachState = PrayerCoachDebugState.initial();
+  String _guidanceMessage = 'قف أمام الهاتف حتى تتم المطابقة.', _lastSpokenGuidance = '', _lastRecognizedText = '', _matchStatus = '';
+  DateTime _lastGuidanceSpokenAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _isListeningForUser = false;
-  String _lastRecognizedText = "";
+  PrayerSessionController? _sessionController;
+  SmartPrayerEngine? _smartPrayerEngine;
+  static const int _maxVerseRetries = 2;
 
   @override
   void initState() {
@@ -85,178 +97,311 @@ class _PrayerScreenState extends State<PrayerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadAllResources());
   }
 
+  void _setFontMode(int mode) {
+    setState(() {
+      _fontMode = mode;
+      _quranFontSize = mode == 0 ? 36 : mode == 1 ? 44 : 60;
+    });
+  }
+
   Future<void> _loadAllResources() async {
     final settings = Provider.of<ThemeProvider>(context, listen: false).settings;
     final l10n = AppLocalizations.of(context);
-    
     _isCameraEnabled = settings.isCameraOn;
     _isCalibrating = _isCameraEnabled;
-
     final allVerses = await _quranService.getAllVerses(excludeFatiha: false);
     final fatihaVerses = allVerses.where((a) => a.surahNumber == 1).toList();
-
-    if (l10n != null) {
-      _fullPrayerFlow = _buildFullPrayerFlow(widget.prayerName, widget.wird, fatihaVerses, l10n);
-    }
-    
+    if (l10n != null) _fullPrayerFlow = _buildFullPrayerFlow(widget.prayerName, widget.wird, fatihaVerses, l10n);
     if (_isCameraEnabled) await _initCamera();
-    
     if (_isCalibrating) {
-      await _anis.speakPositionGuidance('start_prompt');
-      _setupAnisListening();
+      await _speakGuidance('قف أمام الهاتف حتى تتم المطابقة.');
+      _setupCalibrationTakbirListening();
     } else {
-      _startPrayer();
+      await _startPrayer();
     }
-    
     if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _initCamera() async {
-    try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) return;
-      final front = cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.front, orElse: () => cameras.first);
-      _cameraController = CameraController(front, ResolutionPreset.medium, enableAudio: false, imageFormatGroup: ImageFormatGroup.yuv420);
-      await _cameraController!.initialize();
-      _cameraController!.startImageStream((image) async {
-        if (!_isCameraEnabled || !mounted) return;
-        final inputImage = CameraUtils.inputImageFromCameraImage(image, front);
-        if (inputImage != null) {
-          final visibility = await _poseService.analyzePose(inputImage);
-          if (mounted) {
-            setState(() => _lastVisibility = visibility);
-            if (!_prayerStarted && visibility.position == PrayerPosition.takbir) {
-              _startPrayer();
-            } else if (_prayerStarted) {
-              _handleDynamicTransitions(visibility.position);
-            }
-          }
-        }
-      });
-      if (mounted) setState(() => _isCameraReady = true);
-    } catch (e) { debugPrint("Camera Error: $e"); }
+    final cameras = await availableCameras();
+    if (cameras.isEmpty) return;
+    final front = cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.front, orElse: () => cameras.first);
+    _isFrontCamera = front.lensDirection == CameraLensDirection.front;
+    _cameraController = CameraController(front, ResolutionPreset.high, enableAudio: false, imageFormatGroup: ImageFormatGroup.nv21);
+    await _cameraController!.initialize();
+    await _cameraController!.startImageStream((image) async => _processCameraImage(image, front));
+    if (mounted) setState(() => _isCameraReady = true);
   }
 
-  void _setupAnisListening() async {
-    if (!_isAnisListening) {
-      _smartQuran.stopListening();
-      return;
-    }
-    await _smartQuran.startListening((text) {
-      if (mounted && !_prayerStarted && _isAnisListening && (text.contains("الله أكبر") || text.contains("اكبر"))) {
-        _startPrayer();
+  Future<void> _processCameraImage(CameraImage image, CameraDescription camera) async {
+    if (!_isCameraEnabled || !mounted || _isProcessingFrame) return;
+    _frameCounter++;
+    if (_frameCounter % 2 != 0) return;
+    _isProcessingFrame = true;
+    try {
+      final inputImage = _convertCameraImageToInputImage(image, camera);
+      if (inputImage == null) return;
+      final poses = await _poseDetector.processImage(inputImage);
+      final effectiveSize = _effectiveImageSizeForDisplay(rawImageSize: Size(image.width.toDouble(), image.height.toDouble()), sensorOrientation: camera.sensorOrientation);
+      final state = poses.isEmpty ? _coachController.buildNoPoseState(imageSize: effectiveSize) : _coachController.processPose(pose: poses.first, imageSize: effectiveSize);
+      final guidance = _buildGuidanceMessage(state);
+      if (!mounted) return;
+      setState(() {
+        _coachState = state;
+        _guidanceMessage = guidance;
+      });
+      if (_isCalibrating) await _speakGuidance(guidance);
+      if (_prayerStarted && _isTrackablePrayerPosture(state.statePosture)) {
+        _smartPrayerEngine?.markPoseMatched();
+        _trySmartAdvance();
       }
+    } finally {
+      _isProcessingFrame = false;
+    }
+  }
+
+  InputImage? _convertCameraImageToInputImage(CameraImage image, CameraDescription camera) {
+    try {
+      final WriteBuffer allBytes = WriteBuffer();
+      for (final plane in image.planes) { allBytes.putUint8List(plane.bytes); }
+      final bytes = allBytes.done().buffer.asUint8List();
+      final imageSize = Size(image.width.toDouble(), image.height.toDouble());
+      final rotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation) ?? InputImageRotation.rotation0deg;
+      final format = InputImageFormatValue.fromRawValue(image.format.raw) ?? InputImageFormat.nv21;
+      final metadata = InputImageMetadata(size: imageSize, rotation: rotation, format: format, bytesPerRow: image.planes.first.bytesPerRow);
+      return InputImage.fromBytes(bytes: bytes, metadata: metadata);
+    } catch (_) { return null; }
+  }
+
+  Size _effectiveImageSizeForDisplay({required Size rawImageSize, required int sensorOrientation}) {
+    if (sensorOrientation == 90 || sensorOrientation == 270) return Size(rawImageSize.height, rawImageSize.width);
+    return rawImageSize;
+  }
+
+  String _buildGuidanceMessage(PrayerCoachDebugState state) {
+    if (state.matchScore < 0.25) return 'قف في منتصف الشاشة حتى يظهر جسمك بوضوح.';
+    final msg = state.statusMessage.toLowerCase();
+    if (msg.contains('left') || msg.contains('right')) return 'تحرك قليلًا نحو الوسط.';
+    if (msg.contains('close')) return 'ابتعد قليلًا عن الهاتف.';
+    if (msg.contains('far')) return 'اقترب قليلًا من الهاتف.';
+    if (_isCalibrationReady) return 'نحن جاهزون الآن. كبّر لبدء الصلاة أو اضغط زر البدء.';
+    return state.statusMessage.isNotEmpty ? state.statusMessage : 'اضبط تمركزك أمام الكاميرا.';
+  }
+
+  bool get _isCalibrationReady =>
+      _coachState.matchScore >= 0.72 &&
+      (_coachState.statePosture == PrayerPosture.qiyam || _coachState.statePosture == PrayerPosture.unknown) &&
+      _coachState.shouldersVisible &&
+      _coachState.hipsVisible;
+
+  Future<void> _speakGuidance(String message) async {
+    if (message.trim().isEmpty) return;
+    final now = DateTime.now();
+    if (_lastSpokenGuidance == message && now.difference(_lastGuidanceSpokenAt).inSeconds < 3) return;
+    _lastSpokenGuidance = message;
+    _lastGuidanceSpokenAt = now;
+    if (!_isAnisListening) return;
+    await _anis.speak(message);
+  }
+
+  void _setupCalibrationTakbirListening() async {
+    if (!_isAnisListening) { _smartQuran.stopListening(); return; }
+    await _smartQuran.startListening((text) {
+      if (!_isCalibrating || !_isCalibrationReady || !mounted) return;
+      final cleaned = _smartQuran.cleanText(text);
+      if (cleaned.contains('الله اكبر') || cleaned.contains('الله أكبر')) _startPrayer();
     });
   }
 
-  void _startPrayer() async {
+  bool _isTrackablePrayerPosture(PrayerPosture p) => p == PrayerPosture.qiyam || p == PrayerPosture.ruku || p == PrayerPosture.sujud || p == PrayerPosture.jalsa;
+
+  Future<void> _startPrayer() async {
     if (_prayerStarted) return;
-    _smartQuran.stopListening();
-    if (mounted) setState(() { _isCalibrating = false; _prayerStarted = true; });
-    
+    await _smartQuran.stopListening();
+    if (mounted) setState(() { _isCalibrating = false; _prayerStarted = true; _matchStatus = 'بدأت الصلاة'; });
+    _sessionController = PrayerSessionController();
+    _sessionController!.initialize(cameraEnabled: _isCameraEnabled, micEnabled: _isAnisListening);
+    _smartPrayerEngine = SmartPrayerEngine(controller: _sessionController!);
     final audio = Provider.of<AudioProvider>(context, listen: false);
     await audio.setPlaybackRate(_qariSpeed);
-    
     final l10n = AppLocalizations.of(context)!;
     await _anis.speak(l10n.prayerStartConfirm);
-    await Future.delayed(const Duration(seconds: 1));
-    _executeCurrentStep();
-  }
-
-  void _handleDynamicTransitions(PrayerPosition pos) {
-    if (pos == PrayerPosition.unknown) return;
-    final step = _fullPrayerFlow[_currentStepIndex];
-    if (step.isAction && pos == step.expectedPosition && pos != PrayerPosition.standing) {
-       _nextStep();
-    }
+    await Future.delayed(const Duration(milliseconds: 700));
+    await _executeCurrentStep();
   }
 
   Future<void> _executeCurrentStep() async {
-    if (_currentStepIndex >= _fullPrayerFlow.length || !_prayerStarted) return;
+    if (!_prayerStarted || _isExecutingStep || _currentStepIndex >= _fullPrayerFlow.length) return;
+    _isExecutingStep = true;
+    await _smartPrayerEngine?.stopListening();
+    if (mounted) setState(() { _isListeningForUser = false; _lastRecognizedText = ''; });
     final step = _fullPrayerFlow[_currentStepIndex];
     final audio = Provider.of<AudioProvider>(context, listen: false);
-    
-    _smartQuran.stopListening();
-    if (mounted) setState(() { _isListeningForUser = false; _lastRecognizedText = ""; });
+    _smartPrayerEngine?.beginStep(step: step, fallbackDuration: step.isRecitation ? const Duration(seconds: 20) : const Duration(seconds: 12));
+    if (!_isCameraEnabled && !_isAnisListening) {
+      await _executeTimedStep(step, audio);
+    } else if (step.isRecitation && step.wirdIndex != null) {
+      await _executeWirdRecitationStep(step, audio, retryCount: 0);
+    } else if (step.isRecitation) {
+      await _executeGenericRecitationStep(step, audio);
+    } else {
+      await _executeActionStep(step, audio);
+    }
+    _isExecutingStep = false;
+  }
 
+  Future<void> _executeTimedStep(PrayerFlowStep step, AudioProvider audio) async {
     if (_isQariAudioEnabled) {
-      if (step.isRecitation) {
+      if (step.isRecitation && step.surahNumber != null && step.ayahNumber != null) {
         await audio.playVerse(step.surahNumber!, step.ayahNumber!);
-        
-        // تفعيل المصحح الذكي أثناء التلاوة
-        _startRecitationMonitoring(step);
-
         await audio.onPlayerComplete.first;
-        await Future.delayed(Duration(milliseconds: (1500 / _transitionSpeedFactor).toInt()));
-        _nextStep();
-      } else {
-        await _executeActionWithAudio(step, audio);
+      } else if (step.content != null && step.content!.isNotEmpty) {
+        for (int i = 0; i < step.repetitionCount; i++) { await audio.speakActionAndWait(step.content!); }
       }
     } else {
-      // إذا كان الصوت معطلاً، المصحح الذكي هو المحرك الأساسي
-      if (step.isRecitation) {
-        _startRecitationMonitoring(step);
-      } else {
-        await Future.delayed(Duration(seconds: (step.content?.length ?? 5) ~/ (4 * _transitionSpeedFactor).toInt() + 1));
-        _nextStep();
-      }
+      await Future.delayed(step.pauseAfter);
+    }
+    _smartPrayerEngine?.markQariFinished();
+    _trySmartAdvance(forceFallbackIfNeeded: true);
+  }
+
+  Future<void> _executeGenericRecitationStep(PrayerFlowStep step, AudioProvider audio) async {
+    if (_isQariAudioEnabled && step.surahNumber != null && step.ayahNumber != null) {
+      await audio.playVerse(step.surahNumber!, step.ayahNumber!);
+      await audio.onPlayerComplete.first;
+    } else {
+      await Future.delayed(Duration(milliseconds: (1800 / _qariSpeed).toInt()));
+    }
+    _smartPrayerEngine?.markQariFinished();
+    _trySmartAdvance(forceFallbackIfNeeded: true);
+  }
+
+  Future<void> _executeWirdRecitationStep(PrayerFlowStep step, AudioProvider audio, {required int retryCount}) async {
+    if (step.wirdIndex == null || _smartPrayerEngine == null) { await _executeGenericRecitationStep(step, audio); return; }
+    bool shouldRetry = false;
+    if (_isAnisListening) {
+      await _smartPrayerEngine!.startWirdListening(
+        wird: widget.wird,
+        wirdIndex: step.wirdIndex!,
+        onDecision: (text, decision) {
+          if (!mounted) return;
+          setState(() {
+            _isListeningForUser = true;
+            _lastRecognizedText = text;
+            _matchStatus = decision.reason;
+          });
+          if (decision.type == wird_matcher.WirdRecitationDecisionType.retryCurrentAyah) shouldRetry = true;
+          _trySmartAdvance();
+        },
+      );
+    }
+    if (_isQariAudioEnabled && step.surahNumber != null && step.ayahNumber != null) {
+      await audio.playVerse(step.surahNumber!, step.ayahNumber!);
+      await audio.onPlayerComplete.first;
+    } else {
+      await Future.delayed(Duration(milliseconds: (1800 / _qariSpeed).toInt()));
+    }
+    _smartPrayerEngine!.markQariFinished();
+    _trySmartAdvance();
+    await Future.delayed(const Duration(milliseconds: 700));
+    final result = _smartPrayerEngine!.evaluate(step: step, cameraEnabled: _isCameraEnabled, micEnabled: _isAnisListening);
+    if (!result.shouldAdvance && shouldRetry && retryCount < _maxVerseRetries) {
+      if (mounted) setState(() => _matchStatus = 'أعد الآية الحالية من الورد للتصحيح');
+      await _smartPrayerEngine!.stopListening();
+      await Future.delayed(const Duration(milliseconds: 250));
+      await _executeWirdRecitationStep(step, audio, retryCount: retryCount + 1);
+      return;
+    }
+    if (!result.shouldAdvance) {
+      _smartPrayerEngine!.applyAdvanceReason(SmartAdvanceReason.timedFallback);
+      _advanceToNextStep();
     }
   }
 
-  void _startRecitationMonitoring(PrayerFlowStep step) async {
-    if (mounted) setState(() => _isListeningForUser = true);
-    await _smartQuran.startListening((text) {
-      if (mounted) {
-        setState(() => _lastRecognizedText = text);
-        // إذا تطابقت التلاوة بنسبة عالية، ننتقل تلقائياً (تصحيح ذكي)
-        if (_smartQuran.checkSimilarity(step.content ?? "", text) > 0.85) {
-          _smartQuran.stopListening();
-          _nextStep();
-        }
+  Future<void> _executeActionStep(PrayerFlowStep step, AudioProvider audio) async {
+    if (_isQariAudioEnabled && step.content != null && step.content!.isNotEmpty) {
+      for (int i = 0; i < step.repetitionCount; i++) {
+        await audio.speakActionAndWait(step.content!);
+        await Future.delayed(Duration(milliseconds: (950 / _transitionSpeedFactor).toInt()));
       }
-    });
-  }
-
-  Future<void> _executeActionWithAudio(PrayerFlowStep step, AudioProvider audio) async {
-    for (int i = 0; i < step.repetitionCount; i++) {
-      if (!mounted) return;
-      await audio.speakActionAndWait(step.content!);
-      await Future.delayed(Duration(milliseconds: (1200 / _transitionSpeedFactor).toInt()));
+    } else {
+      await Future.delayed(step.pauseAfter);
     }
-    await Future.delayed(Duration(milliseconds: (step.pauseAfter.inMilliseconds / _transitionSpeedFactor).toInt()));
-    _nextStep();
+    _smartPrayerEngine?.markQariFinished();
+    if (!_needsPoseForStep(step)) { _trySmartAdvance(forceFallbackIfNeeded: true); return; }
+    await Future.delayed(const Duration(milliseconds: 500));
+    _trySmartAdvance();
   }
 
-  void _nextStep() {
+  bool _needsPoseForStep(PrayerFlowStep step) => step.isAction && step.expectedPosition != PrayerPosition.standing;
+
+  PrayerPosition _currentTrackedPosition() {
+    switch (_coachState.statePosture) {
+      case PrayerPosture.qiyam:
+        return PrayerPosition.standing;
+      case PrayerPosture.ruku:
+        return PrayerPosition.ruku;
+      case PrayerPosture.sujud:
+        return PrayerPosition.sujud;
+      case PrayerPosture.jalsa:
+        return PrayerPosition.sitting;
+      case PrayerPosture.unknown:
+        return PrayerPosition.unknown;
+    }
+  }
+
+  void _trySmartAdvance({bool forceFallbackIfNeeded = false}) {
+    if (_smartPrayerEngine == null || _currentStepIndex >= _fullPrayerFlow.length) return;
+    final step = _fullPrayerFlow[_currentStepIndex];
+    final trackedPosition = _currentTrackedPosition();
+    if (_needsPoseForStep(step) && trackedPosition == step.expectedPosition) _smartPrayerEngine?.markPoseMatched();
+    final result = _smartPrayerEngine!.evaluate(step: step, cameraEnabled: _isCameraEnabled, micEnabled: _isAnisListening);
+    if (mounted) setState(() => _matchStatus = result.message);
+    if (result.shouldAdvance && result.reason != null) {
+      _smartPrayerEngine!.applyAdvanceReason(result.reason!);
+      _advanceToNextStep();
+      return;
+    }
+    if (forceFallbackIfNeeded && !_needsPoseForStep(step)) {
+      _smartPrayerEngine!.applyAdvanceReason(SmartAdvanceReason.timedFallback);
+      _advanceToNextStep();
+    }
+  }
+
+  void _advanceToNextStep() {
     if (!mounted || !_prayerStarted) return;
     if (_currentStepIndex < _fullPrayerFlow.length - 1) {
-      setState(() => _currentStepIndex++);
-      _executeCurrentStep();
+      setState(() { _currentStepIndex++; _isListeningForUser = false; _lastRecognizedText = ''; });
+      unawaited(_executeCurrentStep());
     } else {
-      _finishPrayer();
+      unawaited(_finishPrayer());
     }
   }
 
   Future<void> _finishPrayer() async {
     await LocalStorageService.markPrayerAsCompleted(widget.prayerName);
-    await _anis.speak("تقبل الله طاعتك. تم إكمال الصلاة بنجاح.");
-    if (mounted) context.pop(); 
+    await _smartPrayerEngine?.dispose();
+    await _anis.speak('تقبل الله طاعتك. تم إكمال الصلاة بنجاح.');
+    if (mounted) context.pop();
   }
 
   @override
   void dispose() {
     _cameraController?.dispose();
-    _poseService.dispose();
+    _poseDetector.close();
+    _coachController.reset();
+    _smartPrayerEngine?.dispose();
     _smartQuran.stopListening();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(backgroundColor: Color(0xFF0D3B2E), body: Center(child: CircularProgressIndicator(color: Color(0xFFF5A623))));
+    if (_isLoading) {
+      return const Scaffold(backgroundColor: Color(0xFF0D3B2E), body: Center(child: CircularProgressIndicator(color: Color(0xFFF5A623))));
+    }
     final l10n = AppLocalizations.of(context)!;
     final step = _fullPrayerFlow[_currentStepIndex];
-
     return IslamicBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -264,238 +409,174 @@ class _PrayerScreenState extends State<PrayerScreen> {
           backgroundColor: Colors.black45,
           elevation: 0,
           leading: IconButton(icon: const Icon(Icons.close, color: Colors.white70), onPressed: () => context.pop()),
-          title: Text(_isCalibrating ? "تحديد الوضعية والسرعة" : step.title, style: GoogleFonts.amiri(color: const Color(0xFFF5A623), fontWeight: FontWeight.bold)),
+          title: Text(_isCalibrating ? 'تحديد الوضعية والسرعة' : step.title, style: GoogleFonts.amiri(color: const Color(0xFFF5A623), fontWeight: FontWeight.bold)),
           centerTitle: true,
         ),
-        body: _isCalibrating ? _buildCalibrationUI(l10n) : _buildPrayerUI(step, l10n),
+        body: _isCalibrating ? _buildCalibrationUI(l10n) : _buildPrayerUI(step),
       ),
     );
   }
 
   Widget _buildCalibrationUI(AppLocalizations l10n) {
     return SingleChildScrollView(
-      child: Column(
-        children: [
-          const SizedBox(height: 15),
-          _buildQuickSettingsPanel(),
-          const SizedBox(height: 15),
-          _buildSpeedSettingsPanel(),
-          const SizedBox(height: 20),
-          Center(
-            child: Container(
-              width: MediaQuery.of(context).size.width * 0.85,
-              height: MediaQuery.of(context).size.height * 0.35,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: const Color(0xFFF5A623), width: 3),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(27),
-                child: _isCameraReady && _cameraController != null 
-                    ? CameraPreview(_cameraController!)
-                    : Container(color: Colors.black87),
-              ),
-            ),
-          ),
-          const SizedBox(height: 30),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF5A623), padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35))),
-            onPressed: _startPrayer,
-            icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 30),
-            label: Text("ابدأ الصلاة الآن", style: GoogleFonts.amiri(color: Colors.black, fontSize: 22, fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 30),
-        ],
-      ),
+      child: Column(children: [
+        const SizedBox(height: 15),
+        _buildFontSizeSelector(),
+        const SizedBox(height: 18),
+        _buildCalibrationPreview(),
+        const SizedBox(height: 16),
+        _buildCalibrationGuidanceCard(),
+        const SizedBox(height: 18),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF5A623), padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35))),
+          onPressed: _startPrayer,
+          icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 30),
+          label: Text('ابدأ الصلاة الآن', style: GoogleFonts.amiri(color: Colors.black, fontSize: 22, fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(height: 30),
+      ]),
     );
   }
 
-  Widget _buildQuickSettingsPanel() {
+  Widget _buildFontSizeSelector() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.white10)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildToggleItem(icon: _isAnisListening ? Icons.mic : Icons.mic_off, label: "أنيس", value: _isAnisListening, onTap: () { setState(() => _isAnisListening = !_isAnisListening); _setupAnisListening(); }),
-          _buildToggleItem(icon: _isQariAudioEnabled ? Icons.volume_up : Icons.volume_off, label: "المقرئ", value: _isQariAudioEnabled, onTap: () => setState(() => _isQariAudioEnabled = !_isQariAudioEnabled)),
-          _buildToggleItem(icon: _isCameraEnabled ? Icons.videocam : Icons.videocam_off, label: "الكاميرا", value: _isCameraEnabled, onTap: () { setState(() => _isCameraEnabled = !_isCameraEnabled); if (_isCameraEnabled) _initCamera(); else _cameraController?.dispose(); }),
-        ],
+      child: Column(children: [
+        Text('قياس خط الورد', style: GoogleFonts.amiri(color: const Color(0xFFF5A623), fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: _fontModeButton('صغير', 0)),
+          const SizedBox(width: 8),
+          Expanded(child: _fontModeButton('كبير', 1)),
+          const SizedBox(width: 8),
+          Expanded(child: _fontModeButton('كبير جدًا', 2)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _fontModeButton(String label, int mode) {
+    final selected = _fontMode == mode;
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(backgroundColor: selected ? const Color(0xFFF5A623) : Colors.white10, foregroundColor: selected ? Colors.black : Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+      onPressed: () => _setFontMode(mode),
+      child: Text(label, textAlign: TextAlign.center),
+    );
+  }
+
+  Widget _buildCalibrationPreview() {
+    if (!_isCameraReady || _cameraController == null) {
+      return Container(height: MediaQuery.of(context).size.height * 0.35, margin: const EdgeInsets.symmetric(horizontal: 20), decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(28)), child: Center(child: Text('الكاميرا غير جاهزة', style: GoogleFonts.amiri(color: Colors.white70))));
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: CameraPosePreview(
+        controller: _cameraController!,
+        displayPreviewSize: Size(_cameraController!.value.previewSize!.height, _cameraController!.value.previewSize!.width),
+        latestImageSize: _coachState.latestImageSize,
+        smoothedLandmarks: _coachState.smoothedLandmarks,
+        isFrontCamera: _isFrontCamera,
+        maxHeight: MediaQuery.of(context).size.height * 0.40,
       ),
     );
   }
 
-  Widget _buildSpeedSettingsPanel() {
+  Widget _buildCalibrationGuidanceCard() {
+    final ready = _isCalibrationReady;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.white10)),
-      child: Column(
-        children: [
-          _buildSpeedSlider("سرعة تلاوة المقرئ", _qariSpeed, 0.75, 1.25, (v) => setState(() => _qariSpeed = v)),
-          const Divider(color: Colors.white10, height: 25),
-          _buildSpeedSlider("سرعة انتقال الأركان", _transitionSpeedFactor, 0.75, 1.5, (v) => setState(() => _transitionSpeedFactor = v)),
-        ],
-      ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: ready ? Colors.green.withOpacity(0.12) : Colors.black38, borderRadius: BorderRadius.circular(22), border: Border.all(color: ready ? Colors.greenAccent.withOpacity(0.35) : const Color(0xFFF5A623).withOpacity(0.28))),
+      child: Column(children: [
+        Text(ready ? 'نحن جاهزون الآن' : 'تعليمات المعايرة', style: GoogleFonts.amiri(color: ready ? Colors.greenAccent : const Color(0xFFF5A623), fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text(_guidanceMessage, textAlign: TextAlign.center, style: GoogleFonts.amiri(color: Colors.white, fontSize: 16, height: 1.6)),
+      ]),
     );
   }
 
-  Widget _buildSpeedSlider(String label, double value, double min, double max, Function(double) onChanged) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: GoogleFonts.amiri(color: Colors.white70, fontSize: 14)),
-            Text(value == 1.0 ? "طبيعي" : value > 1.0 ? "سريع" : "هادئ", style: GoogleFonts.amiri(color: const Color(0xFFF5A623), fontSize: 12)),
-          ],
-        ),
-        Slider(
-          value: value,
-          min: min,
-          max: max,
-          divisions: 4,
-          activeColor: const Color(0xFFF5A623),
-          inactiveColor: Colors.white10,
-          onChanged: onChanged,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildToggleItem({required IconData icon, required String label, required bool value, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          AnimatedContainer(duration: const Duration(milliseconds: 300), padding: const EdgeInsets.all(10), decoration: BoxDecoration(shape: BoxShape.circle, color: value ? const Color(0xFFF5A623).withOpacity(0.2) : Colors.white10, border: Border.all(color: value ? const Color(0xFFF5A623) : Colors.transparent)), child: Icon(icon, color: value ? const Color(0xFFF5A623) : Colors.white60, size: 24)),
-          const SizedBox(height: 5),
-          Text(label, style: GoogleFonts.amiri(color: Colors.white70, fontSize: 11)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrayerUI(PrayerFlowStep step, AppLocalizations l10n) {
-    return Column(
-      children: [
-        const SizedBox(height: 20),
-        if (step.isRecitation && step.surahName != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(color: const Color(0xFFF5A623).withOpacity(0.15), borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFF5A623).withOpacity(0.3))),
-            child: Text("${step.surahName} - آية ${step.ayahNumber}", style: GoogleFonts.amiri(color: const Color(0xFFF5A623), fontSize: 18, fontWeight: FontWeight.bold)),
-          ),
-        const SizedBox(height: 20),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
-            child: Center(
-              child: SingleChildScrollView(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 500),
-                  child: Text(step.content ?? "", key: ValueKey(step.content), textAlign: TextAlign.center, style: GoogleFonts.amiri(color: Colors.white, fontSize: 32, height: 1.8, fontWeight: FontWeight.bold)),
-                ),
+  Widget _buildPrayerUI(PrayerFlowStep step) {
+    return Column(children: [
+      const SizedBox(height: 10),
+      if (_isCameraEnabled) _buildPrayerTrackingBubble(),
+      const SizedBox(height: 10),
+      Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Center(
+            child: SingleChildScrollView(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                decoration: BoxDecoration(color: Colors.black.withOpacity(0.32), borderRadius: BorderRadius.circular(22), border: Border.all(color: Colors.white10)),
+                child: Text(step.content ?? '', textAlign: TextAlign.center, style: GoogleFonts.amiri(color: Colors.white, fontSize: _quranFontSize, height: 2.1, fontWeight: FontWeight.bold)),
               ),
             ),
           ),
         ),
-        
-        // إظهار مؤشر "المصحح الذكي" عندما يستمع النظام للمصلي
-        if (_isListeningForUser)
-          _buildSmartCorrectorUI(),
-
-        _buildBottomControls(l10n),
-        const SizedBox(height: 50),
-      ],
-    );
+      ),
+      const SizedBox(height: 24),
+    ]);
   }
 
-  Widget _buildSmartCorrectorUI() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.redAccent.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.mic, color: Colors.redAccent, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _lastRecognizedText.isEmpty ? "أكمل التلاوة بصوتك..." : _lastRecognizedText,
-              style: GoogleFonts.amiri(color: Colors.white70, fontSize: 16),
-              overflow: TextOverflow.ellipsis,
+  Widget _buildPrayerTrackingBubble() {
+    if (!_isCameraReady || _cameraController == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(start: 16, end: 16),
+      child: Row(children: [
+        Container(
+          width: 112,
+          height: 112,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFF4DFF88).withOpacity(0.85), width: 2.2)),
+          child: ClipOval(
+            child: CameraPosePreview(
+              controller: _cameraController!,
+              displayPreviewSize: Size(_cameraController!.value.previewSize!.height, _cameraController!.value.previewSize!.width),
+              latestImageSize: _coachState.latestImageSize,
+              smoothedLandmarks: _coachState.smoothedLandmarks,
+              isFrontCamera: _isFrontCamera,
+              maxHeight: 112,
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Text('الوضعية الحالية: ${_postureLabel(_coachState.statePosture)}', style: GoogleFonts.amiri(color: Colors.white, fontSize: 15))),
+      ]),
     );
   }
 
-  Widget _buildBottomControls(AppLocalizations l10n) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildControlBtn(_isQariAudioEnabled ? Icons.volume_up : Icons.volume_off, () => setState(() => _isQariAudioEnabled = !_isQariAudioEnabled)),
-        const SizedBox(width: 25),
-        FloatingActionButton(backgroundColor: const Color(0xFFF5A623), child: const Icon(Icons.skip_next, color: Colors.black, size: 30), onPressed: _nextStep),
-        const SizedBox(width: 25),
-        _buildControlBtn(_isCameraEnabled ? Icons.videocam : Icons.videocam_off, () { setState(() => _isCameraEnabled = !_isCameraEnabled); if (_isCameraEnabled) _initCamera(); else _cameraController?.dispose(); }),
-      ],
-    );
-  }
-
-  Widget _buildControlBtn(IconData icon, VoidCallback onTap) {
-    return IconButton(icon: Icon(icon, color: Colors.white70, size: 28), onPressed: onTap);
+  String _postureLabel(PrayerPosture posture) {
+    switch (posture) {
+      case PrayerPosture.qiyam: return 'قيام';
+      case PrayerPosture.ruku: return 'ركوع';
+      case PrayerPosture.sujud: return 'سجود';
+      case PrayerPosture.jalsa: return 'جلوس';
+      case PrayerPosture.unknown: return 'غير واضحة';
+    }
   }
 
   List<PrayerFlowStep> _buildFullPrayerFlow(String prayerName, List<Ayah> wird, List<Ayah> fatiha, AppLocalizations l10n) {
-    List<PrayerFlowStep> flow = [];
+    final flow = <PrayerFlowStep>[];
     final name = prayerName.toLowerCase();
-    int totalRakahs = (name.contains('fajr') || name.contains('فجر')) ? 2 
-                    : (name.contains('maghrib') || name.contains('مغرب')) ? 3 : 4;
-
+    final totalRakahs = (name.contains('fajr') || name.contains('فجر')) ? 2 : (name.contains('maghrib') || name.contains('مغرب')) ? 3 : 4;
+    final firstRakahWird = wird.isEmpty ? <Ayah>[] : wird.sublist(0, (wird.length / 2).ceil());
+    final secondRakahWird = wird.isEmpty ? <Ayah>[] : wird.sublist((wird.length / 2).ceil());
     for (int r = 1; r <= totalRakahs; r++) {
-      flow.add(PrayerFlowStep(r == 1 ? "تكبيرة الإحرام" : "تكبيرة القيام", r, content: "اللَّهُ أَكْبَرُ", isAction: true));
-      if (r == 1) flow.add(PrayerFlowStep(l10n.istiftahDua, r, content: "سُبْحَانَكَ اللَّهُمَّ وَبِحَمْدِكَ، وَتَبَارَكَ اسْمُكَ، وَتَعَالَى جَدُّكَ، وَلَا إِلَهَ غَيْرُكَ", isAction: true));
-      if (r == 1) flow.add(PrayerFlowStep("الاستعاذة", r, content: "أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ", isAction: true));
-      flow.add(PrayerFlowStep("البسملة", r, content: "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ", isAction: true));
-      for (var f in fatiha) {
-        flow.add(PrayerFlowStep("سورة الفاتحة", r, content: f.text, surahName: "سورة الفاتحة", ayahNumber: f.ayahNumber, isRecitation: true, surahNumber: 1));
+      for (final f in fatiha) {
+        flow.add(PrayerFlowStep('سورة الفاتحة', r, content: f.text, surahName: 'سورة الفاتحة', ayahNumber: f.ayahNumber, isRecitation: true, surahNumber: 1));
       }
-      flow.add(PrayerFlowStep(l10n.amin, r, content: "آمِين", isAction: true));
-      if (r <= 2 && wird.isNotEmpty) {
-        flow.add(PrayerFlowStep("البسملة", r, content: "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ", isAction: true));
-        for (var a in wird) {
-          flow.add(PrayerFlowStep("تلاوة الورد", r, content: a.text, surahName: a.surahName, ayahNumber: a.ayahNumber, isRecitation: true, surahNumber: a.surahNumber));
+      final rakahWird = r == 1 ? firstRakahWird : secondRakahWird;
+      if (r <= 2 && rakahWird.isNotEmpty) {
+        for (final a in rakahWird) {
+          flow.add(PrayerFlowStep('تلاوة الورد', r, content: a.text, surahName: a.surahName, ayahNumber: a.ayahNumber, isRecitation: true, surahNumber: a.surahNumber, wirdIndex: widget.wird.indexOf(a)));
         }
       }
-      flow.add(PrayerFlowStep("التكبير للركوع", r, content: "اللَّهُ أَكْبَرُ", isAction: true));
-      flow.add(PrayerFlowStep(l10n.rukuLabel, r, content: "سُبْحَانَ رَبِّيَ الْعَظِيمِ", isAction: true, expectedPosition: PrayerPosition.ruku, repetitionCount: 3));
-      flow.add(PrayerFlowStep("الرفع من الركوع", r, content: "سَمِعَ اللَّهُ لِمَنْ حَمِدَهُ", isAction: true, expectedPosition: PrayerPosition.standing));
-      flow.add(PrayerFlowStep("التحميد", r, content: "رَبَّنَا وَلَكَ الْحَمْدُ", isAction: true, expectedPosition: PrayerPosition.standing, pauseAfter: const Duration(milliseconds: 1500)));
-      flow.add(PrayerFlowStep("التكبير للسجود", r, content: "اللَّهُ أَكْبَرُ", isAction: true));
-      flow.add(PrayerFlowStep(l10n.sujud1Label, r, content: "سُبْحَانَ رَبِّيَ الْأَعْلَى", isAction: true, expectedPosition: PrayerPosition.sujud, repetitionCount: 3));
-      flow.add(PrayerFlowStep("التكبير للجلوس", r, content: "اللَّهُ أَكْبَرُ", isAction: true));
-      flow.add(PrayerFlowStep(l10n.sittingLabel, r, content: "رَبِّ اغْفِرْ لِي. رَبِّ اغْفِرْ لِي", isAction: true, expectedPosition: PrayerPosition.sitting));
-      flow.add(PrayerFlowStep("التكبير للسجود", r, content: "اللَّهُ أَكْبَرُ", isAction: true));
-      flow.add(PrayerFlowStep(l10n.sujud2Label, r, content: "سُبْحَانَ رَبِّيَ الْأَعْلَى", isAction: true, expectedPosition: PrayerPosition.sujud, repetitionCount: 3));
-      if (r == 2 && totalRakahs > 2) {
-        flow.add(PrayerFlowStep("التشهد الأول", r, content: "التَّحِيَّاتُ لِلَّهِ وَالصَّلَوَاتُ وَالطَّيِّبَاتُ، السَّلَامُ عَلَيْكَ أَيُّهَا النَّبِيُّ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ، السَّلَامُ عَلَيْنَا وَعَلَى عِبَادِ اللَّهِ الصَّالِحِينَ. أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَشْهَدُ أَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ", isAction: true, expectedPosition: PrayerPosition.sitting));
-      }
-      if (r == totalRakahs) {
-        flow.add(PrayerFlowStep("التشهد الأخير", r, content: "التَّحِيَّاتُ لِلَّهِ وَالصَّلَوَاتُ وَالطَّيِّبَاتُ، السَّلَامُ عَلَيْكَ أَيُّهَا النَّبِيُّ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ، السَّلَامُ عَلَيْنَا وَعَلَى عِبَادِ اللَّهِ الصَّالِحِينَ. أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَشْهَدُ أَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ", isAction: true, expectedPosition: PrayerPosition.sitting));
-        flow.add(PrayerFlowStep("الصلاة الإبراهيمية", r, content: "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ، كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ، إِنَّكَ حَمِيدٌ مَجِيدٌ. اللَّهُمَّ بَارِكْ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ، كَمَا بَارَكْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ، إِنَّكَ حَمِيدٌ مَجِيدٌ", isAction: true, expectedPosition: PrayerPosition.sitting));
-        flow.add(PrayerFlowStep("دعاء الاستعاذة", r, content: "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ عَذَابِ جَهَنَّمَ، وَمِنْ عَذَابِ الْقَبْرِ، وَمِنْ فِتْنَةِ الْمَحْيَا وَالْمَمَاتِ، وَمِنْ فِتْنَةِ الْمَسِيحِ الدَّجَّالِ", isAction: true));
-        flow.add(PrayerFlowStep("التسليمة الأولى", r, content: "السَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ", isAction: true, expectedPosition: PrayerPosition.sitting));
-        flow.add(PrayerFlowStep("التسليمة الثانية", r, content: "السَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ", isAction: true, expectedPosition: PrayerPosition.sitting));
-      }
+      flow.add(PrayerFlowStep('الركوع', r, content: 'سُبْحَانَ رَبِّيَ الْعَظِيمِ', isAction: true, expectedPosition: PrayerPosition.ruku, repetitionCount: 3));
+      flow.add(PrayerFlowStep('السجود الأول', r, content: 'سُبْحَانَ رَبِّيَ الْأَعْلَى', isAction: true, expectedPosition: PrayerPosition.sujud, repetitionCount: 3));
+      flow.add(PrayerFlowStep('الجلوس', r, content: 'رَبِّ اغْفِرْ لِي', isAction: true, expectedPosition: PrayerPosition.sitting));
+      flow.add(PrayerFlowStep('السجود الثاني', r, content: 'سُبْحَانَ رَبِّيَ الْأَعْلَى', isAction: true, expectedPosition: PrayerPosition.sujud, repetitionCount: 3));
     }
     return flow;
   }
