@@ -15,7 +15,6 @@ class UserVoiceProfile {
 
 class VoiceCalibrationService {
   static const String _speedKey = 'user_voice_speed';
-  static const String _genderKey = 'user_voice_gender';
 
   /// معايرة سرعة المستخدم بناءً على قراءة آية تجريبية
   static Future<double> calibrateSpeed(String originalText, String recognizedText, Duration duration) async {

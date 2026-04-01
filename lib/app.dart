@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'l10n/app_localizations.dart';
 import 'core/providers/audio_provider.dart';
 import 'core/providers/theme_provider.dart';

@@ -43,7 +43,6 @@ class _PrayerCoachDebugScreenState extends State<PrayerCoachDebugScreen> {
   bool _isProcessing = false;
   bool _isFrontCamera = true;
 
-  int _sensorOrientation = 0;
   int _frameCounter = 0;
 
   PrayerCoachDebugState _viewState = PrayerCoachDebugState.initial();
@@ -93,7 +92,6 @@ class _PrayerCoachDebugScreenState extends State<PrayerCoachDebugScreen> {
         }
       }
 
-      _sensorOrientation = selectedCamera.sensorOrientation;
       _isFrontCamera = selectedCamera.lensDirection == CameraLensDirection.front;
 
       final controller = CameraController(

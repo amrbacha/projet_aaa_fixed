@@ -25,6 +25,7 @@ class AssistantService {
 
   bool isListening = false;
   String lastWords = "";
+  // ignore: unused_field
   AnisVoiceProfile _currentProfile = AnisVoiceProfile.companion;
 
   Future<void> init() async {

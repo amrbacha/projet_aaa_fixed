@@ -60,7 +60,7 @@ class PrayerCoachDebugState {
   });
 
   factory PrayerCoachDebugState.initial() {
-    return const PrayerCoachDebugState(
+    return PrayerCoachDebugState(
       statusTitle: 'جارٍ التحضير...',
       statusMessage: 'هذه الشاشة مخصصة لمطابقة الهيكل مع الجسم.',
       matchScore: 0.0,
@@ -70,7 +70,7 @@ class PrayerCoachDebugState {
       candidateStreak: 0,
       statePosture: PrayerPosture.unknown,
       transitionStreak: 0,
-      allowedNextPostures: {
+      allowedNextPostures: const {
         PrayerPosture.qiyam,
         PrayerPosture.ruku,
         PrayerPosture.sujud,
@@ -79,7 +79,7 @@ class PrayerCoachDebugState {
       sequenceState: PrayerSequenceState.unknown,
       sequenceCandidate: PrayerSequenceState.unknown,
       sequenceCandidateStreak: 0,
-      expectedNextSequence: {
+      expectedNextSequence: const {
         PrayerSequenceState.qiyamStart,
       },
       noseVisible: false,
@@ -87,7 +87,7 @@ class PrayerCoachDebugState {
       hipsVisible: false,
       kneesVisible: false,
       anklesVisible: false,
-      smoothedLandmarks: {},
+      smoothedLandmarks: const {},
       latestImageSize: null,
     );
   }

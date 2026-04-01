@@ -1,6 +1,5 @@
 
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:camera/camera.dart';
@@ -24,10 +23,12 @@ import 'package:projet_aaa_fixed/features/prayer_coach/domain/enums/prayer_postu
 import 'package:projet_aaa_fixed/features/prayer_coach/presentation/widgets/camera_pose_preview.dart';
 import 'package:projet_aaa_fixed/features/prayer_session/controllers/prayer_session_controller.dart';
 import 'package:projet_aaa_fixed/features/prayer_session/services/smart_prayer_engine.dart';
+import 'package:projet_aaa_fixed/core/services/pose_detection_service.dart';
 import 'package:projet_aaa_fixed/widgets/islamic_background.dart';
 import '../../../l10n/app_localizations.dart';
 
-enum PrayerPosition { standing, ruku, sujud, sitting, takbir, unknown }
+// Re-export PrayerPosition for consumers that import from this file
+export 'package:projet_aaa_fixed/core/services/pose_detection_service.dart';
 
 class PrayerFlowStep {
   final String title;
