@@ -1,4 +1,3 @@
-import 'package:projet_aaa_fixed/core/models/quran_data.dart';
 import 'package:projet_aaa_fixed/core/services/quran_service.dart';
 import 'package:projet_aaa_fixed/features/adhkar/data/adhkar_data.dart';
 import 'package:projet_aaa_fixed/features/adhkar/data/models/adhkar_model.dart';

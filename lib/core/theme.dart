@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // This class will now generate themes based on provided colors.
@@ -27,7 +26,7 @@ class AppTheme {
         brightness: Brightness.dark,
         primary: primaryColor,
         secondary: accentColor,
-        background: darkBackgroundColor,
+        surface: darkBackgroundColor,
       ),
       scaffoldBackgroundColor: darkBackgroundColor,
       fontFamily: 'Cairo',

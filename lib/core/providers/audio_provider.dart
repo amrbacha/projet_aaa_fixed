@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:projet_aaa_fixed/core/services/settings_service.dart';
-import 'package:projet_aaa_fixed/models/settings_model.dart';
 
 class AudioProvider with ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();

@@ -1,5 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../models/settings_model.dart';
+import '../../../models/settings_model.dart';
 
 class SettingsService {
   static const String settingsKey = 'app_settings';

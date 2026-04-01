@@ -1,7 +1,9 @@
+import 'package:flutter/material.dart';
+
 class ServiceModel {
   final String title;
   final String description;
-  final String imagePath; // يمكن استخدام IconData بدلاً من ذلك
+  final String? imagePath;
   final IconData icon;
   final Color color;
   final VoidCallback? onTap;
@@ -11,6 +13,7 @@ class ServiceModel {
     required this.description,
     required this.icon,
     required this.color,
+    this.imagePath,
     this.onTap,
   });
 }
